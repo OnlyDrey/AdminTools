@@ -1,0 +1,81 @@
+import type { Session } from '../shared/types';
+
+const now = new Date().toISOString();
+
+export const seedSessions: Session[] = [
+  {
+    id: 'seed-rdp-win',
+    name: 'Windows Admin Host',
+    protocol: 'rdp',
+    host: 'win-admin.local',
+    port: 3389,
+    username: 'Administrator',
+    folder: 'Windows',
+    tags: ['windows', 'gui'],
+    favorite: true,
+    colorLabel: '#3B82F6',
+    notes: 'Requires Remote Desktop enabled',
+    created_at: now,
+    updated_at: now,
+    resolutionMode: 'system',
+    fullscreen: false,
+    adminMode: true,
+    clipboard: true,
+    driveRedirection: false,
+    sound: 'local'
+  },
+  {
+    id: 'seed-ssh-linux',
+    name: 'Linux SSH Host',
+    protocol: 'ssh',
+    host: 'linux-core.local',
+    port: 22,
+    username: 'admin',
+    folder: 'Linux',
+    tags: ['linux', 'terminal'],
+    favorite: true,
+    colorLabel: '#22C55E',
+    notes: 'openssh-server required',
+    created_at: now,
+    updated_at: now,
+    terminalProfile: 'default'
+  },
+  {
+    id: 'seed-sftp-linux',
+    name: 'Linux SFTP Host',
+    protocol: 'sftp',
+    host: 'linux-files.local',
+    port: 22,
+    username: 'deploy',
+    folder: 'File Transfer',
+    tags: ['linux', 'files'],
+    favorite: false,
+    colorLabel: '#F59E0B',
+    notes: 'Use with SSH credentials',
+    created_at: now,
+    updated_at: now,
+    showHiddenFiles: false,
+    remotePath: '/var/www'
+  },
+  {
+    id: 'seed-rdp-linux-gui',
+    name: 'Linux GUI via xrdp',
+    protocol: 'rdp',
+    host: 'linux-gui.local',
+    port: 3389,
+    username: 'guiuser',
+    folder: 'Linux GUI',
+    tags: ['linux', 'xrdp'],
+    favorite: false,
+    colorLabel: '#A855F7',
+    notes: 'xrdp and xorgxrdp usually required',
+    created_at: now,
+    updated_at: now,
+    resolutionMode: 'system',
+    fullscreen: true,
+    adminMode: false,
+    clipboard: true,
+    driveRedirection: false,
+    sound: 'off'
+  }
+];

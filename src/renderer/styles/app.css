@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+body { margin: 0; background: #030712; color: #e5e7eb; }
+input, select, button {
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  padding: 0 10px;
+}
+button { cursor: pointer; }
+
+.app { min-height: 100vh; }
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #1f2937;
+  position: sticky; top: 0; background: #030712;
+}
+.layout { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 61px); }
+.sidebar { border-right: 1px solid #1f2937; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sidebar h3 { margin: 8px 0 2px; font-size: 13px; color: #9ca3af; text-transform: uppercase; }
+.sidebar button.active { border-color: #60a5fa; }
+.main { padding: 16px; display: grid; gap: 16px; }
+.card { background: #0b1220; border: 1px solid #1f2937; border-radius: 10px; padding: 12px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.session-list { display: grid; gap: 8px; }
+.session-item { background: #111827; border: 1px solid #1f2937; border-left: 4px solid #374151; border-radius: 8px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
+.muted { color: #9ca3af; margin: 0; font-size: 13px; }
+.tabs { display: grid; gap: 12px; }
+.tab { border: 1px solid #1f2937; border-radius: 8px; padding: 8px; }
+.terminal { width: 100%; height: 260px; }
+.sftp-list { margin-top: 10px; border-top: 1px solid #1f2937; }
+.sftp-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1f2937; }
