@@ -9,5 +9,5 @@
     "types": ["node"],
     "declaration": false
   },
-  "include": ["src/main/**/*.ts", "src/main/**/*.cts", "src/shared/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"]
 }
