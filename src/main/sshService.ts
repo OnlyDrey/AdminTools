@@ -2,16 +2,26 @@ import { Client } from 'ssh2';
 import SftpClient from 'ssh2-sftp-client';
 import type { SftpEntry } from '../shared/types.js';
 
+interface SftpListEntry {
+  name: string;
+  type: string;
+  size: number;
+  modifyTime: number;
+}
+
 const sshConnections = new Map<string, Client>();
 const sftpConnections = new Map<string, SftpClient>();
 
-export async function connectSsh(id: string, config: {
-  host: string;
-  port: number;
-  username: string;
-  password?: string;
-  privateKey?: string;
-}) {
+export async function connectSsh(
+  id: string,
+  config: {
+    host: string;
+    port: number;
+    username: string;
+    password?: string;
+    privateKey?: string;
+  }
+) {
   return new Promise<void>((resolve, reject) => {
     const client = new Client();
     client
@@ -35,12 +45,15 @@ export async function openShell(id: string, onData: (data: string) => void) {
   });
 }
 
-export async function connectSftp(id: string, config: {
-  host: string;
-  port: number;
-  username: string;
-  password?: string;
-}) {
+export async function connectSftp(
+  id: string,
+  config: {
+    host: string;
+    port: number;
+    username: string;
+    password?: string;
+  }
+) {
   const sftp = new SftpClient();
   await sftp.connect(config);
   sftpConnections.set(id, sftp);
@@ -51,8 +64,8 @@ export async function listSftp(id: string, remotePath: string): Promise<SftpEntr
   if (!sftp) {
     throw new Error('SFTP session not connected');
   }
-  const list = await sftp.list(remotePath);
-  return list.map((entry) => ({
+  const list = (await sftp.list(remotePath)) as SftpListEntry[];
+  return list.map((entry: SftpListEntry) => ({
     name: entry.name,
     type: entry.type,
     size: entry.size,

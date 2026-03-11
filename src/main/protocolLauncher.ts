@@ -55,8 +55,8 @@ export async function launchRdp(session: RdpSession) {
   }
 
   if (platform === 'darwin') {
-    const openResult = await shell.openExternal(`rdp://${session.host}:${session.port}`);
-    return openResult ? 'fallback:install-microsoft-remote-desktop' : 'launched:macos-rdp-handler';
+    await shell.openExternal(`rdp://${session.host}:${session.port}`);
+    return 'launched:macos-rdp-handler';
   }
 
   return 'unsupported-platform';

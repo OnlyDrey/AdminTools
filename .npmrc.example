@@ -13,6 +13,9 @@ strict-ssl=true
 ; Optional fallback if internal npm registry is used
 ; registry=https://registry.npmjs.org/
 
+; Option B (when supported by current Node): use system CA trust
+; NODE_USE_SYSTEM_CA=1 (set as environment variable in PowerShell, not in .npmrc)
+
 ; Electron download helper (optional in some corporate networks)
 ; ELECTRON_GET_USE_PROXY=true (set as environment variable in PowerShell, not in .npmrc)
 

@@ -20,6 +20,7 @@ npm config get cafile
 npm config get proxy
 npm config get https-proxy
 echo $env:NODE_EXTRA_CA_CERTS
+echo $env:NODE_USE_SYSTEM_CA
 ```
 
 Optional quick inspection helper:
@@ -35,8 +36,27 @@ npm run check:network-env
 - **Typical root cause:** Node/Electron cannot validate the certificate chain in your corporate network path.
 - **Secondary warnings:** `EPERM` / `EBUSY` cleanup warnings are common on Windows and are often not the true blocker unless install still fails after TLS/proxy trust is correctly configured.
 
-## 2) Configure certificate trust correctly (secure)
-If install fails with `unable to get local issuer certificate`, Electron download is failing because Node does not trust your corporate TLS inspection CA chain.
+## 2) Configure trust in this order
+
+### Option B (try first when supported): use system CA store
+On Node versions that support it, prefer using system CA trust:
+
+Temporary in current PowerShell session:
+
+```powershell
+$env:NODE_USE_SYSTEM_CA="1"
+```
+
+Permanent for current user:
+
+```powershell
+setx NODE_USE_SYSTEM_CA 1
+```
+
+After `setx`, open a **new shell** before running `npm install`.
+
+### Option A (fallback): provide PEM chain manually
+Use this when Option B is unavailable on your Node version or still insufficient in your environment.
 
 1. Export your corporate root/intermediate chain as PEM.
 2. Set environment variable for the current PowerShell session **before running npm install**:
@@ -54,7 +74,6 @@ npm config set cafile "C:\Users\<user>\certs\corp-root-chain.pem"
 ```
 
 4. Keep SSL verification enabled (`strict-ssl=true`).
-5. Depending on Node/environment policy, system CA trust can also help if your org root CA is already installed and recognized.
 
 ## 3) Configure proxy (if required)
 
@@ -114,7 +133,8 @@ Do not use permanent `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 - [ ] Node 21 is not in use
 - [ ] npm is 10+
 - [ ] `strict-ssl` is true
-- [ ] `NODE_EXTRA_CA_CERTS` is set (if required by your network)
+- [ ] `NODE_USE_SYSTEM_CA` configured if supported (Option B)
+- [ ] `NODE_EXTRA_CA_CERTS` is set (Option A fallback, if required)
 - [ ] `cafile` is configured (if required)
 - [ ] `proxy` and `https-proxy` are configured (if required)
 - [ ] Cleanup warnings are treated as secondary unless TLS trust is already correct

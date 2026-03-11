@@ -78,11 +78,15 @@ AdminTools uses **Electron + React + TypeScript** with Node.js runtime services 
 
 If `npm install` fails with `RequestError: unable to get local issuer certificate`, the main blocker is usually environment certificate/proxy trust for Electron download, not project structure.
 
-Use the Windows guide to configure trust securely before retrying:
-- set `NODE_EXTRA_CA_CERTS`
-- optionally set npm `cafile`
+Use this order on Windows:
+- **Option B (try first, when supported):** use system CA trust with `NODE_USE_SYSTEM_CA=1`
+- **Option A (fallback):** set `NODE_EXTRA_CA_CERTS` (PEM chain), optionally npm `cafile`
 - set `proxy` / `https-proxy` if required
 - keep `strict-ssl=true`
+
+Useful helpers:
+- `npm run check:network-env`
+- `npm run repair:env`
 
 ### Install
 
@@ -216,7 +220,8 @@ If `npm install` fails on Windows with `EBUSY/EPERM` cleanup errors or Electron 
 Key points:
 - use Node 22.12+ minimum (recommended baseline: Node 22 LTS; newer Node versions allowed); Node 21 is unsupported
 - main blocker is typically TLS/certificate/proxy trust for Electron download
-- configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) before install
+- Option B first: try `NODE_USE_SYSTEM_CA=1` on Node versions that support it
+- Option A fallback: configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) before install
 - inspect env with `npm run check:network-env`
 - treat EPERM/EBUSY cleanup warnings as secondary unless TLS is already correct
 - treat `strict-ssl=false` only as a temporary diagnostic

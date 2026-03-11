@@ -1,4 +1,4 @@
-import type { AppSettings, VaultFile } from './types';
+import type { AppSettings, VaultFile } from './types.js';
 
 export const VAULT_FILE_NAME = 'admintools.vault.json';
 export const SCHEMA_VERSION = '1.0.0';
