@@ -5,11 +5,11 @@
   "main": "dist/main/main.js",
   "type": "module",
   "engines": {
-    "node": ">=22.12 <23",
+    "node": ">=22.12",
     "npm": ">=10"
   },
   "scripts": {
-    "preinstall": "node -e \"const v=process.versions.node.split('.').map(Number); const ok=(v[0]===22 && v[1]>=12); if(!ok){console.error('AdminTools requires Node >=22.12 <23. Current: '+process.versions.node); process.exit(1);} console.log('Node version OK: '+process.versions.node);\"",
+    "preinstall": "node -e \"const [maj,min]=process.versions.node.split('.').map(Number); const ok=(maj>22)||(maj===22&&min>=12); if(!ok){console.error('AdminTools requires Node >=22.12. Current: '+process.versions.node); process.exit(1);} console.log('Node version OK: '+process.versions.node);\"",
     "clean": "node -e \"const fs=require('fs'); for (const p of ['dist']) fs.rmSync(p,{recursive:true,force:true});\"",
     "dev": "concurrently -k \"tsc -p tsconfig.main.json --watch\" \"vite\" \"wait-on tcp:5173 dist/main/main.js && electron .\"",
     "build": "npm run clean && npm run build:renderer && npm run build:main",
