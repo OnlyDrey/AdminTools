@@ -1,0 +1,17 @@
+; AdminTools secure npm configuration template for Windows/corporate networks
+
+; Keep strict SSL enabled for normal operation
+strict-ssl=true
+
+; Optional: set corporate proxy if required (uncomment and edit)
+; proxy=http://proxy.company.local:8080
+; https-proxy=http://proxy.company.local:8080
+
+; Optional: point Node/npm to a corporate root/intermediate CA bundle (PEM)
+; cafile=C:\\Users\\<you>\\certs\\corp-root-chain.pem
+
+; Optional fallback if internal npm registry is used
+; registry=https://registry.npmjs.org/
+
+; Diagnostics ONLY (do not keep this enabled):
+; strict-ssl=false

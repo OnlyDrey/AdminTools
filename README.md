@@ -171,3 +171,13 @@ Fedora/RHEL-like:
 ## Future RDP plan
 
 Advanced RDP work will focus on better profile generation, reconnect control, dynamic resolution planning, and potential embedded integration with a mature RDP engine after MVP stability.
+
+## Windows 11 install troubleshooting
+
+If `npm install` fails on Windows with `EBUSY/EPERM` cleanup errors or Electron TLS certificate errors, follow the recovery flow in `docs/windows-setup.md`.
+
+Key points:
+- use Node 20 LTS (avoid Node 21 for this toolchain)
+- kill locking processes (`node`, `electron`, `esbuild`) before cleanup
+- configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) instead of disabling SSL
+- treat `strict-ssl=false` only as a temporary diagnostic
