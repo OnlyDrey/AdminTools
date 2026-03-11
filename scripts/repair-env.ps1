@@ -26,7 +26,7 @@ if (Test-Path .\node_modules) {
 
 Write-Host "[AdminTools] Repair complete." -ForegroundColor Green
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  - Confirm Node version is 20.19+ or 22.12+ (not Node 21)" -ForegroundColor White
+Write-Host "  - Confirm Node version is 22.12+ (22.x only; Node 21 unsupported)" -ForegroundColor White
 Write-Host "  - Configure corporate CA if needed (NODE_EXTRA_CA_CERTS / npm cafile)" -ForegroundColor White
 Write-Host "  - Run: npm install" -ForegroundColor White
 Write-Host "  - Run: npm run dev" -ForegroundColor White

@@ -3,9 +3,8 @@
 This project is a Windows desktop app built with Electron + Vite + React.
 
 ## Supported Node.js versions
-- **Recommended:** Node 20.19+
-- **Also supported:** Node 22.12+
-- **Unsupported:** Node 21
+- **Required:** Node 22.12+ (22.x only)
+- **Unsupported:** Node 21 and earlier versions
 
 ## 0) Verify your current environment
 
@@ -14,7 +13,7 @@ node -v
 npm -v
 ```
 
-`package.json` enforces supported LTS lanes via `engines` and a `preinstall` check.
+`package.json` enforces supported versions using both `engines` and a `preinstall` check.
 
 ## 1) Stop common lock holders
 In PowerShell, close IDE terminals and stop lingering node/electron/esbuild processes:
@@ -89,7 +88,7 @@ npm config set strict-ssl true
 Do not keep insecure settings enabled.
 
 ## Windows verification checklist (before install)
-- [ ] Node is 20.19+ or 22.12+
+- [ ] Node is 22.12+ (22.x)
 - [ ] Node 21 is not in use
 - [ ] npm is 10+
 - [ ] No lingering `node`, `electron`, `esbuild` processes
@@ -99,7 +98,7 @@ Do not keep insecure settings enabled.
 - [ ] `strict-ssl` remains enabled
 
 ## Happy path
-1. Use Node 20.19+
+1. Use Node 22.12+
 2. Confirm versions (`node -v`, `npm -v`)
 3. Configure CA/proxy if needed
 4. Clean old install artifacts

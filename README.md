@@ -8,9 +8,8 @@ It focuses on lightweight, local-first workflows for **RDP**, **SSH**, and **SFT
 This is a **Windows 11 desktop application** built with Electron (not a web-only project).
 
 Before running `npm install`, use a supported Node.js LTS lane:
-- **Recommended:** Node **20.19+**
-- **Also supported:** Node **22.12+**
-- **Unsupported:** Node 21
+- **Required:** Node **22.12+** (22.x only)
+- **Unsupported:** Node 21 and earlier Node versions
 
 Check your current environment:
 
@@ -69,7 +68,7 @@ AdminTools uses **Electron + React + TypeScript** with Node.js runtime services 
 ## Getting started
 
 ### Prerequisites
-- Node.js 20.19+ (recommended) or 22.12+
+- Node.js 22.12+ (22.x only)
 - npm 10+
 
 ### Install
@@ -202,7 +201,7 @@ Advanced RDP work will focus on better profile generation, reconnect control, dy
 If `npm install` fails on Windows with `EBUSY/EPERM` cleanup errors or Electron TLS certificate errors, follow the recovery flow in `docs/windows-setup.md`.
 
 Key points:
-- use Node 20.19+ LTS (or Node 22.12+), never Node 21 for this toolchain
+- use Node 22.12+ (22.x only); Node 21 is unsupported
 - kill locking processes (`node`, `electron`, `esbuild`) before cleanup
 - configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) instead of disabling SSL
 - treat `strict-ssl=false` only as a temporary diagnostic
