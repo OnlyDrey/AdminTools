@@ -177,7 +177,7 @@ Advanced RDP work will focus on better profile generation, reconnect control, dy
 If `npm install` fails on Windows with `EBUSY/EPERM` cleanup errors or Electron TLS certificate errors, follow the recovery flow in `docs/windows-setup.md`.
 
 Key points:
-- use Node 20 LTS (avoid Node 21 for this toolchain)
+- use Node 20.19+ LTS (or Node 22.12+), never Node 21 for this toolchain
 - kill locking processes (`node`, `electron`, `esbuild`) before cleanup
 - configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) instead of disabling SSL
 - treat `strict-ssl=false` only as a temporary diagnostic

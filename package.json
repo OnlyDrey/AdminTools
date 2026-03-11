@@ -5,7 +5,7 @@
   "main": "dist/main/main.js",
   "type": "module",
   "engines": {
-    "node": ">=20.11 <21 || >=22.11",
+    "node": ">=20.19 <21 || >=22.12",
     "npm": ">=10"
   },
   "scripts": {
@@ -37,7 +37,7 @@
     "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.3.3",
     "concurrently": "^9.1.0",
-    "electron": "^31.7.7",
+    "electron": "31.7.7",
     "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "typescript": "^5.6.3",

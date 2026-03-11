@@ -1,11 +1,11 @@
 # Windows 11 setup and recovery guide
 
 ## Recommended baseline
-- Node.js: **20 LTS** (20.11+)
+- Node.js: **20 LTS** (20.19+)
 - npm: 10+
 - Shell: PowerShell 7+ or Windows PowerShell
 
-Node 21 is not recommended for this project due to package engine constraints.
+Node 21 is not supported for this project due to package engine constraints. Secondary supported lane is Node 22.12+.
 
 ## 1) Cleanly stop locking processes
 In PowerShell, close IDE terminals and stop lingering node/electron/esbuild processes:
