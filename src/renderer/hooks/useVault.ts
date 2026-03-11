@@ -10,7 +10,7 @@ export function useVault() {
 
   useEffect(() => {
     if (!window.api || typeof window.api.loadVault !== 'function') {
-      setBridgeError('Preload API is unavailable. Ensure Electron loaded preload.js before renderer startup.');
+      setBridgeError('Preload API is unavailable. Ensure Electron loaded preload.cjs before renderer startup.');
       return;
     }
 

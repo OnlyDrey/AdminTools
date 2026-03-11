@@ -65,7 +65,7 @@ export function App() {
           <section className="card">
             <h2>Renderer startup error</h2>
             <p className="muted">{bridgeError}</p>
-            <p className="muted">Check preload path and run <code>npm run dev</code> with generated <code>build/main/preload.js</code>.</p>
+            <p className="muted">Check preload path and run <code>npm run dev</code> with generated <code>build/main/preload.cjs</code>.</p>
           </section>
         </main>
       </div>

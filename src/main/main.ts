@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Session, VaultFile } from '../shared/types.js';
@@ -31,11 +32,17 @@ function createWindow(route = '/') {
     height: 900,
     backgroundColor: '#111827',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
+
+  const preloadPath = path.join(__dirname, 'preload.cjs');
+  if (!fs.existsSync(preloadPath)) {
+    console.warn(`[AdminTools] preload file missing at runtime: ${preloadPath}`);
+  }
+  console.info(`[AdminTools] preload path: ${preloadPath}`);
 
   const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
   if (!app.isPackaged) {
