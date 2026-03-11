@@ -6,7 +6,7 @@ import { SshTerminal } from './components/SshTerminal';
 import { useVault } from './hooks/useVault';
 
 export function App() {
-  const { vault, upsertSession, deleteSession, duplicateSession, save } = useVault();
+  const { vault, upsertSession, deleteSession, duplicateSession, save, bridgeError } = useVault();
   const [search, setSearch] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [activeTabIds, setActiveTabIds] = useState<string[]>([]);
@@ -57,6 +57,20 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+
+  if (bridgeError) {
+    return (
+      <div className="app dark">
+        <main className="main">
+          <section className="card">
+            <h2>Renderer startup error</h2>
+            <p className="muted">{bridgeError}</p>
+            <p className="muted">Check preload path and run <code>npm run dev</code> with generated <code>build/main/preload.js</code>.</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
   const activeTabs = activeTabIds
     .map((id) => sessions.find((session) => session.id === id))
     .filter(Boolean) as Session[];

@@ -6,15 +6,26 @@ import { seedSessions } from '../seed';
 export function useVault() {
   const [vault, setVault] = useState<VaultFile | null>(null);
   const [masterPassword, setMasterPassword] = useState('admin');
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
 
   useEffect(() => {
-    window.api.loadVault(masterPassword).then((loaded) => {
-      if (loaded.sessions.length === 0) {
-        loaded.sessions = seedSessions;
-      }
-      loaded.appSettings = loaded.appSettings ?? DEFAULT_SETTINGS;
-      setVault(loaded);
-    });
+    if (!window.api || typeof window.api.loadVault !== 'function') {
+      setBridgeError('Preload API is unavailable. Ensure Electron loaded preload.js before renderer startup.');
+      return;
+    }
+
+    setBridgeError(null);
+    window.api.loadVault(masterPassword)
+      .then((loaded) => {
+        if (loaded.sessions.length === 0) {
+          loaded.sessions = seedSessions;
+        }
+        loaded.appSettings = loaded.appSettings ?? DEFAULT_SETTINGS;
+        setVault(loaded);
+      })
+      .catch((error: unknown) => {
+        setBridgeError(`Failed to load vault: ${(error as Error).message}`);
+      });
   }, [masterPassword]);
 
   const save = async (next: VaultFile) => {
@@ -47,5 +58,5 @@ export function useVault() {
     await upsertSession(clone);
   };
 
-  return { vault, masterPassword, setMasterPassword, save, upsertSession, deleteSession, duplicateSession };
+  return { vault, masterPassword, setMasterPassword, bridgeError, save, upsertSession, deleteSession, duplicateSession };
 }
