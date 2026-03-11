@@ -3,6 +3,31 @@
 AdminTools is a modern, simple, user-friendly desktop remote session manager for administrators and technical users.
 It focuses on lightweight, local-first workflows for **RDP**, **SSH**, and **SFTP** with a cleaner UX and a practical MVP path.
 
+## Windows setup before install
+
+This is a **Windows 11 desktop application** built with Electron (not a web-only project).
+
+Before running `npm install`, use a supported Node.js LTS lane:
+- **Recommended:** Node **20.19+**
+- **Also supported:** Node **22.12+**
+- **Unsupported:** Node 21
+
+Check your current environment:
+
+```powershell
+node -v
+npm -v
+```
+
+Read this first before installing:
+- [Windows setup guide](./docs/windows-setup.md)
+
+Quick repair helper (Windows PowerShell):
+
+```powershell
+npm run repair:env
+```
+
 ## Why this stack
 
 AdminTools uses **Electron + React + TypeScript** with Node.js runtime services because it gives:
@@ -44,7 +69,7 @@ AdminTools uses **Electron + React + TypeScript** with Node.js runtime services 
 ## Getting started
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 20.19+ (recommended) or 22.12+
 - npm 10+
 
 ### Install

@@ -1,63 +1,107 @@
 # Windows 11 setup and recovery guide
 
-## Recommended baseline
-- Node.js: **20 LTS** (20.19+)
-- npm: 10+
-- Shell: PowerShell 7+ or Windows PowerShell
+This project is a Windows desktop app built with Electron + Vite + React.
 
-Node 21 is not supported for this project due to package engine constraints. Secondary supported lane is Node 22.12+.
+## Supported Node.js versions
+- **Recommended:** Node 20.19+
+- **Also supported:** Node 22.12+
+- **Unsupported:** Node 21
 
-## 1) Cleanly stop locking processes
+## 0) Verify your current environment
+
+```powershell
+node -v
+npm -v
+```
+
+`package.json` enforces supported LTS lanes via `engines` and a `preinstall` check.
+
+## 1) Stop common lock holders
 In PowerShell, close IDE terminals and stop lingering node/electron/esbuild processes:
 
 ```powershell
 Get-Process node,electron,esbuild -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-If Defender/AV is locking files, add your repo path to allow-list according to your policy.
+If Defender/AV is locking files, add your repo path to allow-list according to your company policy.
 
-## 2) Remove lock files and node_modules safely
+## 2) Remove failed install artifacts safely
+
 ```powershell
 Remove-Item -Recurse -Force .\node_modules -ErrorAction SilentlyContinue
 Remove-Item -Force .\package-lock.json -ErrorAction SilentlyContinue
 npm cache verify
 ```
 
-If `node_modules` is still locked:
+Fallback if Windows still reports locked folders:
+
 ```powershell
 cmd /c rmdir /s /q node_modules
 ```
 
-## 3) Configure certificate trust correctly (secure path)
-When Electron download fails with `unable to get local issuer certificate`, your corporate TLS inspection CA is not trusted by Node.
-
-1. Export your corporate root/intermediate CA chain as PEM.
-2. Set environment variable for your session:
+Optional helper script (same behavior, Windows-focused):
 
 ```powershell
-$env:NODE_EXTRA_CA_CERTS="C:\Users\<you>\certs\corp-root-chain.pem"
+npm run repair:env
 ```
 
-3. Optionally mirror in `.npmrc` with `cafile=...`.
-4. Re-run install.
+## 3) Configure certificate trust correctly (secure)
+If install fails with `unable to get local issuer certificate`, Electron download is failing because Node does not trust your corporate TLS inspection CA chain.
 
-## 4) Proxy configuration (if required)
+1. Export your corporate root/intermediate chain as PEM.
+2. Set environment variable for the current PowerShell session:
+
+```powershell
+$env:NODE_EXTRA_CA_CERTS="C:\Users\<user>\certs\corp-root-chain.pem"
+```
+
+3. Optionally also set npm CA file:
+
+```powershell
+npm config set cafile "C:\Users\<user>\certs\corp-root-chain.pem"
+```
+
+4. Keep SSL verification enabled (`strict-ssl=true`).
+
+## 4) Configure npm proxy (if required)
+
 ```powershell
 npm config set proxy http://proxy.company.local:8080
 npm config set https-proxy http://proxy.company.local:8080
 ```
 
 ## 5) Install and run
+
 ```powershell
 npm install
 npm run dev
 ```
 
 ## Temporary diagnostics only (insecure)
-Use only to confirm TLS root-cause, then revert immediately:
+Use only to prove TLS root cause, then revert immediately:
 
 ```powershell
 npm config set strict-ssl false
 npm install
 npm config set strict-ssl true
 ```
+
+Do not keep insecure settings enabled.
+
+## Windows verification checklist (before install)
+- [ ] Node is 20.19+ or 22.12+
+- [ ] Node 21 is not in use
+- [ ] npm is 10+
+- [ ] No lingering `node`, `electron`, `esbuild` processes
+- [ ] `node_modules` removed after failed installs
+- [ ] Corporate CA path is configured when required
+- [ ] Proxy is configured when required
+- [ ] `strict-ssl` remains enabled
+
+## Happy path
+1. Use Node 20.19+
+2. Confirm versions (`node -v`, `npm -v`)
+3. Configure CA/proxy if needed
+4. Clean old install artifacts
+5. Run `npm install`
+6. Run `npm run dev`
