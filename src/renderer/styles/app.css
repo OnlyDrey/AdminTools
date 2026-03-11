@@ -7,8 +7,8 @@ body { margin: 0; background: #030712; color: #e5e7eb; }
 input, select, button {
   height: 36px;
   border-radius: 8px;
-  border: 1px solid #374151;
-  background: #111827;
+  border: 1px solid #334155;
+  background: #0f172a;
   color: #e5e7eb;
   padding: 0 10px;
 }
@@ -17,25 +17,83 @@ button { cursor: pointer; }
 .app { min-height: 100vh; }
 .topbar {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12px;
   padding: 12px;
   border-bottom: 1px solid #1f2937;
-  position: sticky; top: 0; background: #030712;
+  position: sticky;
+  top: 0;
+  background: #030712;
+  z-index: 3;
 }
-.layout { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 61px); }
+.topbar-3 { grid-template-columns: 1fr 1fr auto; }
+
+.layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 61px); }
 .sidebar { border-right: 1px solid #1f2937; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.sidebar h3 { margin: 8px 0 2px; font-size: 13px; color: #9ca3af; text-transform: uppercase; }
-.sidebar button.active { border-color: #60a5fa; }
-.main { padding: 16px; display: grid; gap: 16px; }
+.nav-tree .group-toggle { background: #111827; text-align: left; font-weight: 600; }
+.nav-item { display: flex; justify-content: space-between; align-items: center; text-align: left; }
+.badge { font-size: 12px; color: #93c5fd; }
+.sidebar button.active { border-color: #60a5fa; background: #1e293b; }
+
+.main { padding: 16px; display: grid; gap: 14px; align-content: start; }
 .card { background: #0b1220; border: 1px solid #1f2937; border-radius: 10px; padding: 12px; }
 .row { display: flex; gap: 8px; align-items: center; }
-.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
-.session-list { display: grid; gap: 8px; }
-.session-item { background: #111827; border: 1px solid #1f2937; border-left: 4px solid #374151; border-radius: 8px; padding: 8px; display: flex; justify-content: space-between; align-items: center; }
+.between { justify-content: space-between; }
+.end { justify-content: flex-end; }
+
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .muted { color: #9ca3af; margin: 0; font-size: 13px; }
-.tabs { display: grid; gap: 12px; }
-.tab { border: 1px solid #1f2937; border-radius: 8px; padding: 8px; }
+
+.session-list { display: grid; gap: 8px; }
+.session-row {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.session-row:hover { border-color: #334155; background: #0f172a; }
+.session-primary { display: flex; align-items: center; gap: 10px; }
+.session-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: #1e293b; }
+
+.menu { position: relative; }
+.menu summary { list-style: none; width: 36px; height: 36px; border: 1px solid #334155; border-radius: 8px; display: grid; place-items: center; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  min-width: 150px;
+  padding: 6px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0b1220;
+  display: grid;
+  gap: 4px;
+  z-index: 5;
+}
+.menu-panel button { width: 100%; text-align: left; }
+
+.tab-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; }
+
 .terminal { width: 100%; height: 260px; }
 .sftp-list { margin-top: 10px; border-top: 1px solid #1f2937; }
 .sftp-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1f2937; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+.modal { width: min(860px, 92vw); }
+
+@media (max-width: 1080px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { border-right: none; border-bottom: 1px solid #1f2937; }
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

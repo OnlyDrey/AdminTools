@@ -4,9 +4,11 @@ import type { Protocol, Session } from '../../shared/types';
 interface SessionFormProps {
   onSave: (session: Session) => Promise<void>;
   existing?: Session;
+  onCancel?: () => void;
+  title?: string;
 }
 
-export function SessionForm({ onSave, existing }: SessionFormProps) {
+export function SessionForm({ onSave, existing, onCancel, title }: SessionFormProps) {
   const [protocol, setProtocol] = useState<Protocol>(existing?.protocol ?? 'ssh');
   const [name, setName] = useState(existing?.name ?? '');
   const [host, setHost] = useState(existing?.host ?? '');
@@ -55,7 +57,10 @@ export function SessionForm({ onSave, existing }: SessionFormProps) {
 
   return (
     <div className="card">
-      <h3>{existing ? 'Edit session' : 'New session'}</h3>
+      <div className="row between">
+        <h3>{title ?? (existing ? 'Edit session' : 'New session')}</h3>
+        {onCancel && <button onClick={onCancel}>Close</button>}
+      </div>
       <div className="form-grid">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Session name" />
         <select value={protocol} onChange={(e) => setProtocol(e.target.value as Protocol)}>
@@ -67,7 +72,9 @@ export function SessionForm({ onSave, existing }: SessionFormProps) {
         <input value={port} onChange={(e) => setPort(Number(e.target.value))} placeholder="Port" type="number" />
         <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
       </div>
-      <button onClick={submit}>Save session</button>
+      <div className="row end">
+        <button onClick={submit}>Save session</button>
+      </div>
     </div>
   );
 }

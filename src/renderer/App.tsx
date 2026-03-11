@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Session } from '../shared/types';
+import type { Protocol, Session } from '../shared/types';
 import { SessionForm } from './components/SessionForm';
 import { SftpBrowser } from './components/SftpBrowser';
 import { SshTerminal } from './components/SshTerminal';
 import { useVault } from './hooks/useVault';
 
+const protocolIcon: Record<Protocol, string> = {
+  rdp: '🖥️',
+  ssh: '⌨️',
+  sftp: '📁'
+};
+
 export function App() {
   const { vault, upsertSession, deleteSession, duplicateSession, save, bridgeError } = useVault();
   const [search, setSearch] = useState('');
+  const [quickConnect, setQuickConnect] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [activeTabIds, setActiveTabIds] = useState<string[]>([]);
   const [editing, setEditing] = useState<Session | undefined>();
+  const [showForm, setShowForm] = useState(false);
+  const [collapse, setCollapse] = useState({ folders: false, favorites: false, recent: false });
 
   const sessions = vault?.sessions ?? [];
 
@@ -22,7 +31,7 @@ export function App() {
     });
   }, [search, selectedFolder, sessions]);
 
-  const favorites = filtered.filter((item) => item.favorite);
+  const favorites = sessions.filter((item) => item.favorite);
   const folders = ['all', ...new Set(sessions.map((item) => item.folder).filter(Boolean) as string[])];
 
   const openTab = (session: Session) => {
@@ -51,12 +60,12 @@ export function App() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
         event.preventDefault();
         setEditing(undefined);
+        setShowForm(true);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
-
 
   if (bridgeError) {
     return (
@@ -71,86 +80,130 @@ export function App() {
       </div>
     );
   }
+
   const activeTabs = activeTabIds
     .map((id) => sessions.find((session) => session.id === id))
     .filter(Boolean) as Session[];
 
+  const recentSessions = (vault?.appSettings.recentSessionIds ?? [])
+    .map((id) => sessions.find((item) => item.id === id))
+    .filter(Boolean) as Session[];
+
   return (
     <div className="app dark">
-      <header className="topbar">
-        <input id="quick-connect" placeholder="Quick connect (host:port)" />
-        <input id="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Global search" />
+      <header className="topbar topbar-3">
+        <input
+          id="quick-connect"
+          value={quickConnect}
+          onChange={(e) => setQuickConnect(e.target.value)}
+          placeholder="Quick connect (host:port)"
+        />
+        <input id="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search sessions" />
+        <button onClick={() => { setEditing(undefined); setShowForm(true); }}>＋ New Session</button>
       </header>
+
       <div className="layout">
-        <aside className="sidebar">
-          <h3>Folders</h3>
-          {folders.map((folder) => (
-            <button key={folder} className={selectedFolder === folder ? 'active' : ''} onClick={() => setSelectedFolder(folder)}>
-              {folder}
+        <aside className="sidebar nav-tree">
+          <button className="group-toggle" onClick={() => setCollapse((s) => ({ ...s, folders: !s.folders }))}>📂 Folders ({folders.length - 1})</button>
+          {!collapse.folders && folders.map((folder) => (
+            <button key={folder} className={selectedFolder === folder ? 'active nav-item' : 'nav-item'} onClick={() => setSelectedFolder(folder)}>
+              <span>{folder}</span>
+              <span className="badge">{folder === 'all' ? sessions.length : sessions.filter((s) => s.folder === folder).length}</span>
             </button>
           ))}
-          <h3>Favorites</h3>
-          {favorites.map((session) => (
-            <button key={session.id} onClick={() => openTab(session)}>{session.name}</button>
+
+          <button className="group-toggle" onClick={() => setCollapse((s) => ({ ...s, favorites: !s.favorites }))}>⭐ Favorites ({favorites.length})</button>
+          {!collapse.favorites && favorites.map((session) => (
+            <button key={session.id} className="nav-item" onClick={() => openTab(session)}>{protocolIcon[session.protocol]} {session.name}</button>
           ))}
-          <h3>Recent</h3>
-          {(vault?.appSettings.recentSessionIds ?? []).map((id) => {
-            const session = sessions.find((item) => item.id === id);
-            return session ? <button key={id} onClick={() => openTab(session)}>{session.name}</button> : null;
-          })}
+
+          <button className="group-toggle" onClick={() => setCollapse((s) => ({ ...s, recent: !s.recent }))}>🕘 Recent ({recentSessions.length})</button>
+          {!collapse.recent && recentSessions.map((session) => (
+            <button key={session.id} className="nav-item" onClick={() => openTab(session)}>{protocolIcon[session.protocol]} {session.name}</button>
+          ))}
         </aside>
 
         <main className="main">
           <section className="card">
-            <div className="row">
+            <div className="row between"><h3>Session Tabs</h3></div>
+            <div className="tab-strip">
+              {activeTabs.length === 0 && <p className="muted">No open tabs yet. Open a session from the list.</p>}
+              {activeTabs.map((session) => (
+                <button key={session.id} className="tab-pill" onClick={() => openTab(session)}>
+                  {protocolIcon[session.protocol]} {session.name}
+                  <span onClick={(e) => { e.stopPropagation(); setActiveTabIds((current) => current.filter((id) => id !== session.id)); }}> ×</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="row between">
               <h2>Sessions</h2>
-              <button onClick={() => setEditing(undefined)}>New session</button>
+              <p className="muted">{filtered.length} shown</p>
             </div>
             <div className="session-list">
               {filtered.map((session) => (
-                <div className="session-item" key={session.id}>
-                  <div>
-                    <strong>{session.name}</strong>
-                    <p className="muted">{session.protocol.toUpperCase()} · {session.host}:{session.port}</p>
+                <div className="session-row" key={session.id}>
+                  <div className="session-primary">
+                    <div className="session-icon">{protocolIcon[session.protocol]}</div>
+                    <div>
+                      <strong>{session.name}</strong>
+                      <p className="muted">{session.protocol.toUpperCase()} · {session.host}:{session.port}</p>
+                    </div>
                   </div>
                   <div className="row">
                     <button onClick={() => openTab(session)}>Open</button>
-                    <button onClick={() => setEditing(session)}>Edit</button>
-                    <button onClick={() => duplicateSession(session)}>Duplicate</button>
-                    {session.protocol === 'rdp' && <button onClick={() => window.api.launchRdp(session)}>Launch RDP</button>}
-                    <button onClick={() => window.api.detachSession(session)}>Detach</button>
-                    <button onClick={() => deleteSession(session.id)}>Delete</button>
+                    <details className="menu">
+                      <summary>⋮</summary>
+                      <div className="menu-panel">
+                        <button onClick={() => { setEditing(session); setShowForm(true); }}>Edit</button>
+                        <button onClick={() => duplicateSession(session)}>Duplicate</button>
+                        {session.protocol === 'rdp' && <button onClick={() => window.api.launchRdp(session)}>Launch RDP</button>}
+                        <button onClick={() => window.api.detachSession(session)}>Detach</button>
+                        <button onClick={() => deleteSession(session.id)}>Delete</button>
+                      </div>
+                    </details>
                   </div>
                 </div>
               ))}
             </div>
           </section>
 
-          <SessionForm onSave={upsertSession} existing={editing} />
-
-          <section className="card">
-            <div className="row"><h3>Session Tabs</h3></div>
-            <div className="tabs">
-              {activeTabs.map((session) => (
-                <div key={session.id} className="tab">
-                  <div className="row">
-                    <strong>{session.name}</strong>
-                    <button onClick={() => setActiveTabIds((current) => current.filter((id) => id !== session.id))}>×</button>
-                  </div>
-                  {session.protocol === 'ssh' && <SshTerminal title={session.name} />}
-                  {session.protocol === 'sftp' && <SftpBrowser session={session} />}
-                  {session.protocol === 'rdp' && (
-                    <div>
-                      <p>RDP sessions launch in the system client in MVP.</p>
-                      <button onClick={() => window.api.launchRdp(session)}>Reconnect with system RDP client</button>
-                    </div>
-                  )}
+          {activeTabs.map((session) => (
+            <section key={session.id} className="card">
+              <div className="row between">
+                <strong>{protocolIcon[session.protocol]} {session.name}</strong>
+                <button onClick={() => setActiveTabIds((current) => current.filter((id) => id !== session.id))}>Close tab</button>
+              </div>
+              {session.protocol === 'ssh' && <SshTerminal title={session.name} />}
+              {session.protocol === 'sftp' && <SftpBrowser session={session} />}
+              {session.protocol === 'rdp' && (
+                <div>
+                  <p>RDP sessions launch in system client in MVP.</p>
+                  <button onClick={() => window.api.launchRdp(session)}>Reconnect with system RDP client</button>
                 </div>
-              ))}
-            </div>
-          </section>
+              )}
+            </section>
+          ))}
         </main>
       </div>
+
+      {showForm && (
+        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <SessionForm
+              onSave={async (session) => {
+                await upsertSession(session);
+                setShowForm(false);
+                setEditing(undefined);
+              }}
+              existing={editing}
+              onCancel={() => { setShowForm(false); setEditing(undefined); }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
