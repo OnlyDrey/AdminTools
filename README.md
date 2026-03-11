@@ -23,9 +23,10 @@ npm -v
 Read this first before installing:
 - [Windows setup guide](./docs/windows-setup.md)
 
-Quick repair helper (Windows PowerShell):
+Quick helpers (Windows PowerShell):
 
 ```powershell
+npm run check:network-env
 npm run repair:env
 ```
 
@@ -72,6 +73,16 @@ AdminTools uses **Electron + React + TypeScript** with Node.js runtime services 
 ### Prerequisites
 - Node.js 22.12+ (recommended baseline: Node 22 LTS; newer Node versions allowed)
 - npm 10+
+
+### Corporate network note (important)
+
+If `npm install` fails with `RequestError: unable to get local issuer certificate`, the main blocker is usually environment certificate/proxy trust for Electron download, not project structure.
+
+Use the Windows guide to configure trust securely before retrying:
+- set `NODE_EXTRA_CA_CERTS`
+- optionally set npm `cafile`
+- set `proxy` / `https-proxy` if required
+- keep `strict-ssl=true`
 
 ### Install
 
@@ -204,6 +215,8 @@ If `npm install` fails on Windows with `EBUSY/EPERM` cleanup errors or Electron 
 
 Key points:
 - use Node 22.12+ minimum (recommended baseline: Node 22 LTS; newer Node versions allowed); Node 21 is unsupported
-- kill locking processes (`node`, `electron`, `esbuild`) before cleanup
-- configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) instead of disabling SSL
+- main blocker is typically TLS/certificate/proxy trust for Electron download
+- configure trusted corporate CA (`NODE_EXTRA_CA_CERTS` / `cafile`) before install
+- inspect env with `npm run check:network-env`
+- treat EPERM/EBUSY cleanup warnings as secondary unless TLS is already correct
 - treat `strict-ssl=false` only as a temporary diagnostic

@@ -13,5 +13,8 @@ strict-ssl=true
 ; Optional fallback if internal npm registry is used
 ; registry=https://registry.npmjs.org/
 
+; Electron download helper (optional in some corporate networks)
+; ELECTRON_GET_USE_PROXY=true (set as environment variable in PowerShell, not in .npmrc)
+
 ; Diagnostics ONLY (do not keep this enabled):
 ; strict-ssl=false

@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
-    "repair:env": "powershell -ExecutionPolicy Bypass -File .\\scripts\\repair-env.ps1"
+    "repair:env": "powershell -ExecutionPolicy Bypass -File .\\scripts\\repair-env.ps1",
+    "check:network-env": "powershell -ExecutionPolicy Bypass -File .\\scripts\\check-network-env.ps1"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
