@@ -1,65 +1,45 @@
 # AdminTools Native Rewrite (Qt 6 / C++)
 
-This folder contains the first serious native Windows rewrite foundation for AdminTools.
+This folder contains the native Windows rewrite foundation for AdminTools.
 
-## Why Qt 6 Widgets
+## Standard setup/build flow (Windows 11)
 
-Qt 6 Widgets is selected for phase 1 because it provides:
+Use the repo-level scripts as the canonical flow:
 
-- mature desktop shell primitives (menus, toolbars, dock widgets, splitters, tabs)
-- practical multi-pane and tabbed workspace implementation speed
-- straightforward host integration path for Windows-native controls (including planned ActiveX-based RDP control hosting)
-- CMake-first build flow compatible with Visual Studio on Windows 11
-
-Qt Quick is intentionally deferred until shell/workspace behavior stabilizes.
-
-## Quickstart (Windows 11)
-
-### Prerequisites
-- Windows 11
-- Visual Studio 2022 (Desktop development with C++)
-- CMake 3.24+
-- Qt 6.5+ (Core, Gui, Widgets)
-
-### Configure
+1. Bootstrap prerequisites:
 
 ```powershell
-cmake -S admintools-native -B out/native -G "Visual Studio 17 2022" -A x64
+.\scripts\bootstrap-native.ps1
 ```
 
-### Build
+2. If prompted, approve install (`Y`).
+3. If packages were newly installed, rerun bootstrap in a fresh terminal.
+4. Build:
 
 ```powershell
-cmake --build out/native --config Debug
+.\scripts\build-native.ps1
 ```
 
-### Run
+5. Optional Release build:
+
+```powershell
+.\scripts\build-native.ps1 -Configuration Release
+```
+
+6. Run app:
 
 ```powershell
 .\out\native\src\Debug\AdminToolsNative.exe
 ```
 
-### Run tests
+## Why rerun bootstrap after installs?
 
-```powershell
-ctest --test-dir out/native -C Debug --output-on-failure
-```
+Newly installed tools (CMake/Build Tools) may not be discoverable in the current terminal session until environment refresh.
 
-## Scope in this milestone
+## References
 
-- Native shell: menu, toolbar, navigation/sidebar docks, session list, central tab/pane workspace.
-- Core domain models in C++ (`Session`, `CredentialProfile`, `FolderNode`, `SessionTemplate`, `WorkspaceState`, etc.).
-- JSON persistence skeleton for vault/session metadata and workspace state.
-- Windows credential storage abstraction via Credential Manager API.
-- Protocol controllers with phase-1 implementations/stubs:
-  - SSH path adapter (planned `libssh2` backend)
-  - SFTP path adapter (planned native transfer backend)
-  - RDP controller with honest capability reporting + external `mstsc` fallback
-
-## Recommended reading order
-
-1. [`docs/getting-started.md`](./docs/getting-started.md)
-2. [`docs/architecture-overview.md`](./docs/architecture-overview.md)
-3. [`docs/framework-rationale.md`](./docs/framework-rationale.md)
-4. [`docs/migration-strategy.md`](./docs/migration-strategy.md)
-5. [`docs/feature-parity.md`](./docs/feature-parity.md)
+- Setup checklist: [`../docs/native-windows-setup.md`](../docs/native-windows-setup.md)
+- Native onboarding: [`docs/getting-started.md`](./docs/getting-started.md)
+- Architecture: [`docs/architecture-overview.md`](./docs/architecture-overview.md)
+- Migration plan: [`docs/migration-strategy.md`](./docs/migration-strategy.md)
+- Feature parity: [`docs/feature-parity.md`](./docs/feature-parity.md)

@@ -5,30 +5,30 @@ AdminTools is being rewritten as a **native Windows 11 desktop application in C+
 - **Primary implementation (active):** `admintools-native/` (Qt 6 + CMake + C++)
 - **Legacy implementation (kept in parallel):** existing Electron + React + TypeScript app in repo root
 
-This repository now contains both tracks so we can migrate safely without losing workflows.
+## Native developer quickstart (standard flow)
 
-## Start here
+1. Run prerequisite bootstrap:
 
-### If you are working on the native rewrite (recommended)
-1. Read [`admintools-native/README.md`](./admintools-native/README.md).
-2. Follow the full native onboarding guide: [`admintools-native/docs/getting-started.md`](./admintools-native/docs/getting-started.md).
-3. Review native architecture and roadmap docs under [`admintools-native/docs/`](./admintools-native/docs).
+```powershell
+.\scripts\bootstrap-native.ps1
+```
 
-### If you need to run the legacy Electron app
-- Use the setup steps in [`docs/windows-setup.md`](./docs/windows-setup.md).
-- Treat Electron as compatibility/transition track while native milestones land.
+2. Approve installation with `Y` if prompted.
+3. If bootstrap installed packages, reopen terminal if needed and rerun bootstrap.
+4. Build native project:
 
-## Native rewrite goals
+```powershell
+.\scripts\build-native.ps1
+```
 
-The native rewrite is focused on:
-- native Windows desktop shell (no Electron runtime dependency)
-- session-centric architecture in C++
-- tabbed + split-pane workspace model
-- Windows-native credential handling
-- RDP-first strategy with honest embedded feasibility path
-- phased migration from current vault/settings model
+See full setup checklist and behavior notes:
+- [`docs/native-windows-setup.md`](./docs/native-windows-setup.md)
 
-For implementation status and parity tracking see:
-- [`admintools-native/docs/feature-parity.md`](./admintools-native/docs/feature-parity.md)
-- [`admintools-native/docs/migration-strategy.md`](./admintools-native/docs/migration-strategy.md)
-- [`admintools-native/docs/rdp-embedding-feasibility.md`](./admintools-native/docs/rdp-embedding-feasibility.md)
+See native project docs:
+- [`admintools-native/README.md`](./admintools-native/README.md)
+- [`admintools-native/docs/getting-started.md`](./admintools-native/docs/getting-started.md)
+
+## Legacy Electron track
+
+If you need to run the legacy Electron app, use:
+- [`docs/windows-setup.md`](./docs/windows-setup.md)
