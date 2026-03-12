@@ -122,6 +122,26 @@ const activitySchema = z.object({
   message: z.string()
 });
 
+
+const workspaceViewInstanceSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  createdAt: z.string()
+});
+
+const workspacePaneSchema = z.object({
+  id: z.string(),
+  tabIds: z.array(z.string()).default([]),
+  activeTabId: z.string().optional(),
+  size: z.number().positive().default(1)
+});
+
+const workspaceLayoutSchema = z.object({
+  split: z.enum(['none', 'vertical', 'horizontal']).default('none'),
+  panes: z.array(workspacePaneSchema).default([{ id: 'pane-main', tabIds: [], size: 1 }]),
+  focusedPaneId: z.string().optional()
+});
+
 export const vaultSchema = z.object({
   schemaVersion: z.string(),
   appSettings: z.object({
@@ -151,9 +171,11 @@ export const vaultSchema = z.object({
         toolbarVisible: z.boolean().optional(),
         ssh: z.object({ fontSize: z.number().optional(), wrap: z.boolean().optional() }).optional(),
         sftp: z.object({ localPath: z.string().optional(), remotePath: z.string().optional() }).optional()
-      })).default([])
+      })).default([]),
+      viewInstances: z.array(workspaceViewInstanceSchema).default([]),
+      layout: workspaceLayoutSchema.optional()
     }).default({
-      reopenOnStartup: true, reconnectOnStartup: false, restoreActiveTab: true, restoreSidebar: true, openTabIds: [], detachedSessionIds: [], expandedFolderIds: [], tabState: []
+      reopenOnStartup: true, reconnectOnStartup: false, restoreActiveTab: true, restoreSidebar: true, openTabIds: [], detachedSessionIds: [], expandedFolderIds: [], tabState: [], viewInstances: [], layout: { split: 'none', panes: [{ id: 'pane-main', tabIds: [], size: 1 }], focusedPaneId: 'pane-main' }
     })
   }),
   sessions: z.array(sessionSchema),

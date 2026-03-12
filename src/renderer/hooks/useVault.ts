@@ -31,7 +31,12 @@ export function useVault() {
         loaded.templates = loaded.templates ?? [];
         loaded.smartViews = loaded.smartViews ?? [];
         loaded.activityLog = loaded.activityLog ?? [];
-        loaded.appSettings.workspace = loaded.appSettings.workspace ?? DEFAULT_SETTINGS.workspace;
+        loaded.appSettings.workspace = { ...DEFAULT_SETTINGS.workspace, ...(loaded.appSettings.workspace ?? {}) };
+        loaded.appSettings.workspace.layout = loaded.appSettings.workspace.layout ?? DEFAULT_SETTINGS.workspace.layout;
+        loaded.appSettings.workspace.viewInstances = loaded.appSettings.workspace.viewInstances ?? [];
+        if (!loaded.appSettings.workspace.layout?.panes?.length) {
+          loaded.appSettings.workspace.layout = DEFAULT_SETTINGS.workspace.layout;
+        }
         setVault(loaded);
       })
       .catch((error: unknown) => {

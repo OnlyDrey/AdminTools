@@ -32,6 +32,7 @@ import {
 } from './vaultService.js';
 import { deleteCredentialSecret, getCredentialSecret, setCredentialSecret } from './credentialSecureStore.js';
 import { launchRdpSession } from './rdpLaunchService.js';
+import { detectRdpEmbeddedCapability } from './rdpEmbeddedCapability.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -217,6 +218,8 @@ ipcMain.handle('credentials:resolve', async (_event, credentialId: string) => {
     type: credential.type
   };
 });
+
+ipcMain.handle('rdp:embedded-capability', async () => detectRdpEmbeddedCapability());
 
 ipcMain.handle('rdp:launch', async (_event, session: Session) => {
   if (!inMemoryVault) throw new Error('Vault not loaded');

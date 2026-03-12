@@ -24,7 +24,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     expandedFolderIds: [],
     searchQuery: '',
     selectedViewId: undefined,
-    tabState: []
+    tabState: [],
+    viewInstances: [],
+    layout: {
+      split: 'none',
+      panes: [{ id: 'pane-main', tabIds: [], size: 1 }],
+      focusedPaneId: 'pane-main'
+    }
   }
 };
 

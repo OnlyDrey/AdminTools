@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { CredentialProfile, Session, RdpLaunchResult, SessionImportExport, SftpEntry, VaultFile } from '../shared/types';
+import type { CredentialProfile, Session, RdpEmbeddedCapability, RdpLaunchResult, SessionImportExport, SftpEntry, VaultFile } from '../shared/types';
 
 declare global {
   interface Window {
@@ -20,6 +20,7 @@ declare global {
       updateCredential(payload: CredentialProfile, password?: string): Promise<CredentialProfile[]>;
       deleteCredential(credentialId: string): Promise<CredentialProfile[]>;
       resolveCredential(credentialId: string): Promise<{ id: string; username: string; password: string; domain?: string; type: string } | undefined>;
+      getRdpEmbeddedCapability(): Promise<RdpEmbeddedCapability>;
       launchRdp(session: Session): Promise<RdpLaunchResult>;
       detachSession(session: Session): Promise<boolean>;
       reattachSession(sessionId: string): Promise<boolean>;

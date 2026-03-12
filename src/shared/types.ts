@@ -51,6 +51,26 @@ export interface ConnectionDiagnostic {
 }
 
 
+
+export interface WorkspaceViewInstance {
+  id: string;
+  sessionId: string;
+  createdAt: string;
+}
+
+export interface WorkspacePane {
+  id: string;
+  tabIds: string[];
+  activeTabId?: string;
+  size: number;
+}
+
+export interface WorkspaceLayout {
+  split: 'none' | 'vertical' | 'horizontal';
+  panes: WorkspacePane[];
+  focusedPaneId?: string;
+}
+
 export interface WorkspaceTabState {
   sessionId: string;
   displayMode?: 'fit' | 'actual' | 'stretch' | 'fullscreen';
@@ -72,6 +92,8 @@ export interface WorkspaceState {
   searchQuery?: string;
   selectedViewId?: string;
   tabState: WorkspaceTabState[];
+  viewInstances?: WorkspaceViewInstance[];
+  layout?: WorkspaceLayout;
 }
 
 export interface SmartView {
@@ -198,6 +220,14 @@ export interface SessionImportExport {
   sessions: Session[];
 }
 
+
+
+export interface RdpEmbeddedCapability {
+  available: boolean;
+  mode: 'embedded' | 'external';
+  reason: string;
+  helperPath?: string;
+}
 
 export interface RdpLaunchResult {
   status: 'launching' | 'launched' | 'failed';

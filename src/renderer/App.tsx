@@ -1,17 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ConnectionDiagnostic, ConnectionState, CredentialProfile, FolderNode, RdpLaunchResult, RdpSession, Session, SessionTemplate, SmartView } from '../shared/types';
+import type {
+  ConnectionDiagnostic,
+  ConnectionState,
+  CredentialProfile,
+  FolderNode,
+  RdpEmbeddedCapability,
+  RdpLaunchResult,
+  RdpSession,
+  Session,
+  SessionTemplate,
+  SmartView,
+  WorkspaceLayout,
+  WorkspacePane,
+  WorkspaceViewInstance
+} from '../shared/types';
 import { ActivityLogPanel } from './components/ActivityLogPanel';
 import { CredentialManager } from './components/CredentialManager';
+import { RdpSessionPanel } from './components/RdpSessionPanel';
 import { RemoteSessionToolbar, type RemoteCommand } from './components/RemoteSessionToolbar';
 import { RemoteView } from './components/RemoteView';
-import { RdpSessionPanel } from './components/RdpSessionPanel';
 import { SessionForm } from './components/SessionForm';
 import { SessionTreeSidebar } from './components/SessionTreeSidebar';
 import { SftpExplorerView } from './components/SftpExplorerView';
 import { SshTerminalView } from './components/SshTerminalView';
+import { useVault } from './hooks/useVault';
 import { routeRemoteCommand } from './remoteCommandRouter';
 import { getSessionMetaLabel, resolveSessionIcon } from './sessionIcons';
-import { useVault } from './hooks/useVault';
+
+const defaultLayout: WorkspaceLayout = {
+  split: 'none',
+  panes: [{ id: 'pane-main', tabIds: [], size: 1 }],
+  focusedPaneId: 'pane-main'
+};
 
 export function App() {
   const {
@@ -29,13 +49,11 @@ export function App() {
     deleteTemplate,
     clearActivity,
     updateWorkspace,
-    upsertSmartView,
-    deleteSmartView
+    upsertSmartView
   } = useVault();
 
   const [search, setSearch] = useState('');
   const [quickConnect, setQuickConnect] = useState('');
-  const [activeTabIds, setActiveTabIds] = useState<string[]>([]);
   const [editing, setEditing] = useState<Session | undefined>();
   const [showForm, setShowForm] = useState(false);
   const [credentials, setCredentials] = useState<CredentialProfile[]>([]);
@@ -48,12 +66,8 @@ export function App() {
   const [sessionMessages, setSessionMessages] = useState<Record<string, string>>({});
   const [diagnostics, setDiagnostics] = useState<Record<string, ConnectionDiagnostic | undefined>>({});
   const [rdpLaunchInfo, setRdpLaunchInfo] = useState<Record<string, RdpLaunchResult | undefined>>({});
+  const [rdpCapability, setRdpCapability] = useState<RdpEmbeddedCapability | undefined>();
   const didRestoreRef = useRef(false);
-  const detachedSessionId = useMemo(() => {
-    const hash = window.location.hash.replace(/^#/, '');
-    if (!hash.startsWith('/detached/')) return undefined;
-    return hash.split('/')[2];
-  }, []);
 
   const sessions = vault?.sessions ?? [];
   const folders = vault?.folders ?? [];
@@ -63,8 +77,13 @@ export function App() {
   const smartViews = vault?.smartViews ?? [];
   const workspace = vault?.appSettings.workspace;
 
+  const layout = workspace?.layout ?? defaultLayout;
+  const viewInstances = workspace?.viewInstances ?? [];
+  const focusedPaneId = layout.focusedPaneId ?? layout.panes[0]?.id;
+
   useEffect(() => {
     window.api.listCredentials().then(setCredentials).catch(() => setCredentials([]));
+    window.api.getRdpEmbeddedCapability().then(setRdpCapability).catch(() => setRdpCapability(undefined));
   }, [vault?.schemaVersion]);
 
   const activeView = smartViews.find((v) => v.id === workspace?.selectedViewId);
@@ -87,22 +106,6 @@ export function App() {
 
   const visibleSessions = useMemo(() => filtered.slice(0, 250), [filtered]);
 
-  const openTab = async (session: Session) => {
-    setSelectedSessionId(session.id);
-    setActiveTabIds((current) => (current.includes(session.id) ? current : [...current, session.id]));
-    setSessionStatus((current) => ({ ...current, [session.id]: current[session.id] ?? 'idle' }));
-    updateWorkspace({ openTabIds: Array.from(new Set([...(workspace?.openTabIds ?? []), session.id])), activeTabId: session.id }).catch(() => undefined);
-    if (vault && !vault.appSettings.recentSessionIds.includes(session.id)) {
-      await save({
-        ...vault,
-        appSettings: {
-          ...vault.appSettings,
-          recentSessionIds: [session.id, ...vault.appSettings.recentSessionIds].slice(0, 20)
-        }
-      });
-    }
-  };
-
   const setToast = (sessionId: string, message: string) => {
     setSessionMessages((current) => ({ ...current, [sessionId]: message }));
     window.setTimeout(() => {
@@ -120,14 +123,7 @@ export function App() {
       setToast(session.id, message);
       setDiagnostics((current) => ({
         ...current,
-        [session.id]: {
-          host: session.host,
-          protocol: session.protocol,
-          port: session.port,
-          timestamp: new Date().toISOString(),
-          category,
-          message
-        }
+        [session.id]: { host: session.host, protocol: session.protocol, port: session.port, timestamp: new Date().toISOString(), category, message }
       }));
     }
     await addActivity({
@@ -140,9 +136,72 @@ export function App() {
     });
   };
 
+  const persistWorkspace = async (patch: Partial<typeof workspace>) => {
+    await updateWorkspace(patch as any);
+  };
+
+  const getView = (viewId: string) => viewInstances.find((v) => v.id === viewId);
+  const getSessionForView = (viewId?: string) => {
+    if (!viewId) return undefined;
+    const view = getView(viewId);
+    if (!view) return undefined;
+    return sessions.find((s) => s.id === view.sessionId);
+  };
+
+  const openSessionInPane = async (session: Session, paneId = focusedPaneId) => {
+    if (!paneId) return;
+    const viewId = crypto.randomUUID();
+    const view: WorkspaceViewInstance = { id: viewId, sessionId: session.id, createdAt: new Date().toISOString() };
+    const nextViews = [...viewInstances, view];
+    const nextPanes = layout.panes.map((pane) => pane.id === paneId ? { ...pane, tabIds: [...pane.tabIds, viewId], activeTabId: viewId } : pane);
+    await persistWorkspace({ viewInstances: nextViews, layout: { ...layout, panes: nextPanes, focusedPaneId: paneId } });
+    setSessionStatus((current) => ({ ...current, [session.id]: current[session.id] ?? 'idle' }));
+    if (vault && !vault.appSettings.recentSessionIds.includes(session.id)) {
+      await save({ ...vault, appSettings: { ...vault.appSettings, recentSessionIds: [session.id, ...vault.appSettings.recentSessionIds].slice(0, 20) } });
+    }
+  };
+
+  const splitFocusedPane = async (direction: 'vertical' | 'horizontal', session?: Session) => {
+    const sourcePane = layout.panes.find((p) => p.id === focusedPaneId) ?? layout.panes[0];
+    if (!sourcePane) return;
+    const newPaneId = crypto.randomUUID();
+    let nextViews = [...viewInstances];
+    const newTabIds: string[] = [];
+    if (session) {
+      const v: WorkspaceViewInstance = { id: crypto.randomUUID(), sessionId: session.id, createdAt: new Date().toISOString() };
+      nextViews = [...nextViews, v];
+      newTabIds.push(v.id);
+    }
+    const panes = layout.panes.map((p) => p.id === sourcePane.id ? { ...p, size: p.size / 2 } : p);
+    panes.push({ id: newPaneId, tabIds: newTabIds, activeTabId: newTabIds[0], size: sourcePane.size / 2 });
+    await persistWorkspace({ viewInstances: nextViews, layout: { split: direction, panes, focusedPaneId: newPaneId } });
+    if (session) setSessionStatus((current) => ({ ...current, [session.id]: current[session.id] ?? 'idle' }));
+  };
+
+  const closeView = async (pane: WorkspacePane, viewId: string) => {
+    const nextViews = viewInstances.filter((v) => v.id !== viewId);
+    const nextPanes = layout.panes.map((p) => {
+      if (p.id !== pane.id) return p;
+      const tabIds = p.tabIds.filter((id) => id !== viewId);
+      return { ...p, tabIds, activeTabId: tabIds.includes(p.activeTabId ?? '') ? p.activeTabId : tabIds[0] };
+    }).filter((p) => p.tabIds.length > 0 || layout.panes.length === 1);
+    const normalized = nextPanes.length ? nextPanes : [{ id: 'pane-main', tabIds: [], size: 1 }];
+    await persistWorkspace({ viewInstances: nextViews, layout: { ...layout, panes: normalized, focusedPaneId: normalized[0].id } });
+  };
+
+  const closePane = async (paneId: string) => {
+    if (layout.panes.length <= 1) return;
+    const pane = layout.panes.find((p) => p.id === paneId);
+    if (!pane) return;
+    const remove = new Set(pane.tabIds);
+    const nextViews = viewInstances.filter((v) => !remove.has(v.id));
+    const nextPanes = layout.panes.filter((p) => p.id !== paneId);
+    const equalSize = 1 / nextPanes.length;
+    await persistWorkspace({ viewInstances: nextViews, layout: { ...layout, panes: nextPanes.map((p) => ({ ...p, size: equalSize })), focusedPaneId: nextPanes[0]?.id } });
+  };
 
   const launchRdpFromTab = async (session: RdpSession) => {
-    await setState(session, 'connecting', 'Launching external RDP client…');
+    await setState(session, 'connecting', 'Launching RDP…');
     const result = await window.api.launchRdp(session);
     setRdpLaunchInfo((current) => ({ ...current, [session.id]: result }));
     if (result.status === 'failed') {
@@ -160,16 +219,11 @@ export function App() {
           await launchRdpFromTab(session);
           return;
         }
-        window.setTimeout(() => {
-          setState(session, 'connected', 'Connected');
-        }, 350);
+        window.setTimeout(() => { setState(session, 'connected', 'Connected'); }, 250);
       },
-      disconnect: async () => {
-        await setState(session, 'disconnected', 'Session disconnected');
-      },
+      disconnect: async () => setState(session, 'disconnected', 'Session disconnected'),
       detach: async () => {
         await window.api.detachSession(session);
-        setActiveTabIds((current) => current.filter((id) => id !== session.id));
         setToast(session.id, 'Detached to session window');
       },
       feedback: (message) => setToast(session.id, message)
@@ -177,98 +231,24 @@ export function App() {
   };
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('[data-terminal-input="true"]')) return;
-
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        document.getElementById('quick-connect')?.focus();
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        document.getElementById('search')?.focus();
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
-        event.preventDefault();
-        setEditing(undefined);
-        setShowForm(true);
-      }
-      if (event.key === 'Enter' && quickConnect.includes(':')) {
-        const [host, port] = quickConnect.split(':');
-        addActivity({ eventType: 'quick_connect_used', protocol: 'ssh', targetHost: host, status: 'ok', message: `Quick connect used for ${host}:${port}` }).catch(() => undefined);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [addActivity, quickConnect]);
-
-  if (bridgeError) {
-    return (
-      <div className="app dark">
-        <main className="main">
-          <section className="card">
-            <div className="row between"><h3>Smart Views</h3><button onClick={() => updateWorkspace({ selectedViewId: undefined })}>Clear</button></div>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              {smartViews.sort((a,b)=>a.order-b.order).map((view) => (
-                <button key={view.id} className={workspace?.selectedViewId === view.id ? 'active' : ''} onClick={() => updateWorkspace({ selectedViewId: view.id })}>
-                  {view.icon ?? '🔎'} {view.name}
-                </button>
-              ))}
-              {smartViews.length === 0 && <p className="muted">No saved views yet.</p>}
-            </div>
-          </section>
-          <section className="card">
-            <h2>Renderer startup error</h2>
-            <p className="muted">{bridgeError}</p>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
-  const activeTabs = activeTabIds.map((id) => sessions.find((session) => session.id === id)).filter(Boolean) as Session[];
-  const recentSessions = (vault?.appSettings.recentSessionIds ?? []).map((id) => sessions.find((item) => item.id === id)).filter(Boolean) as Session[];
-
-  const selectedIndex = visibleSessions.findIndex((s) => s.id === selectedSessionId);
-
-
-  useEffect(() => {
-    if (!workspace?.reopenOnStartup) return;
-    if (didRestoreRef.current) return;
-    const restoredIds = (workspace.openTabIds ?? []).filter((id) => sessions.some((s) => s.id === id));
-    if (restoredIds.length === 0) {
-      didRestoreRef.current = true;
-      return;
-    }
-    setActiveTabIds(restoredIds);
-    if (workspace.restoreActiveTab && workspace.activeTabId) {
-      setSelectedSessionId(workspace.activeTabId);
-    }
-    if (workspace.searchQuery) {
-      setSearch(workspace.searchQuery);
-    }
+    if (!workspace?.reopenOnStartup || didRestoreRef.current) return;
     didRestoreRef.current = true;
-    if (workspace.reconnectOnStartup) {
-      restoredIds.forEach((id, index) => {
-        const session = sessions.find((s) => s.id === id);
-        if (!session) return;
-        window.setTimeout(() => {
-          handleToolbarCommand(session, 'reconnect').catch(() => undefined);
-        }, 250 * index);
-      });
-    }
-  }, [workspace, sessions]);
+    if (workspace.searchQuery) setSearch(workspace.searchQuery);
+  }, [workspace]);
 
   useEffect(() => {
     if (!workspace) return;
     updateWorkspace({ searchQuery: search }).catch(() => undefined);
   }, [search, updateWorkspace, workspace]);
 
+  const moveSessionToFolder = async (sessionId: string, folderId?: string) => {
+    if (!vault) return;
+    const sessionsNext = vault.sessions.map((session) => (session.id === sessionId ? { ...session, folderId } : session));
+    await reorderSessions(sessionsNext);
+  };
 
-
-  const renderSessionSurface = (session: Session) => (
-    <section key={session.id} className="card remote-session-card">
+  const renderSessionSurface = (session: Session, viewId: string) => (
+    <section key={viewId} className="remote-session-pane">
       <RemoteSessionToolbar session={session} status={sessionStatus[session.id] ?? 'idle'} onCommand={(command) => handleToolbarCommand(session, command)} />
       {sessionMessages[session.id] && <p className="muted remote-toast">{sessionMessages[session.id]}</p>}
       {diagnostics[session.id] && <p className="muted">{diagnostics[session.id]?.category}: {diagnostics[session.id]?.message}</p>}
@@ -289,44 +269,26 @@ export function App() {
           />
         )}
       </RemoteView>
+      {session.protocol === 'rdp' && (
+        <p className="muted rdp-mode-note">
+          RDP mode: {rdpCapability?.available ? 'Embedded helper detected (experimental)' : 'External client mode'}.
+          {rdpCapability ? ` ${rdpCapability.reason}` : ''}
+        </p>
+      )}
     </section>
   );
 
-  if (detachedSessionId) {
-    const detachedSession = sessions.find((s) => s.id === detachedSessionId);
-    if (!detachedSession) {
-      return <div className="app dark"><main className="main"><section className="card"><h3>Detached session not found</h3></section></main></div>;
-    }
-    return (
-      <div className="app dark detached-app">
-        <header className="topbar detached-topbar">
-          <strong>{detachedSession.name}</strong>
-          <span className="muted">{detachedSession.protocol.toUpperCase()} • {sessionStatus[detachedSession.id] ?? 'idle'}</span>
-          <button onClick={() => window.api.reattachSession(detachedSession.id)}>Reattach to main window</button>
-        </header>
-        <main className="main">{renderSessionSurface(detachedSession)}</main>
-      </div>
-    );
+  if (bridgeError) {
+    return <div className="app dark"><main className="main"><section className="card"><h2>Renderer startup error</h2><p className="muted">{bridgeError}</p></section></main></div>;
   }
 
-  const moveSessionToFolder = async (sessionId: string, folderId?: string) => {
-    if (!vault) return;
-    const sessionsNext = vault.sessions.map((session) => (session.id === sessionId ? { ...session, folderId } : session));
-    await reorderSessions(sessionsNext);
-  };
-
   return (
-    <div className="app dark">
+    <div className="app dark polished">
       <header className="topbar topbar-3">
         <input id="quick-connect" value={quickConnect} onChange={(e) => setQuickConnect(e.target.value)} placeholder="Quick connect (host:port)" />
         <input id="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search sessions" />
         <div className="row">
           <button onClick={() => setShowActivity(true)}>Activity</button>
-          <button onClick={async () => {
-            const name = prompt('Smart view name');
-            if (!name) return;
-            await upsertSmartView({ id: crypto.randomUUID(), name, query: search, folderId: selectedFolderId, pinned: true, order: smartViews.length });
-          }}>Save view</button>
           <button onClick={() => setShowTemplates(true)}>Templates</button>
           <button onClick={() => setShowCredentials(true)}>Credentials</button>
           <button onClick={() => { setEditing(undefined); setShowForm(true); }}>＋ New Session</button>
@@ -367,139 +329,81 @@ export function App() {
         />
 
         <main className="main">
-          <section className="card">
-            <div className="row between"><h3>Smart Views</h3><button onClick={() => updateWorkspace({ selectedViewId: undefined })}>Clear</button></div>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              {smartViews.sort((a,b)=>a.order-b.order).map((view) => (
-                <button key={view.id} className={workspace?.selectedViewId === view.id ? 'active' : ''} onClick={() => updateWorkspace({ selectedViewId: view.id })}>
-                  {view.icon ?? '🔎'} {view.name}
-                </button>
-              ))}
-              {smartViews.length === 0 && <p className="muted">No saved views yet.</p>}
-            </div>
-          </section>
-          <section className="card">
-            <div className="row between"><h3>Session Tabs</h3></div>
-            <div className="tab-strip">
-              {activeTabs.length === 0 && <p className="muted">No open tabs yet. Open a session from the list.</p>}
-              {activeTabs.map((session) => (
-                <button key={session.id} className="tab-pill" title={getSessionMetaLabel(session)} onClick={() => openTab(session)}>
-                  {resolveSessionIcon(session).startsWith('data:') ? <img className="session-icon-img" src={resolveSessionIcon(session)} alt="session icon" /> : resolveSessionIcon(session)} {session.name}
-                  <span onClick={(e) => { e.stopPropagation(); setActiveTabIds((current) => current.filter((id) => id !== session.id)); }}> ×</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="card">
+          <section className="card compact-card">
             <div className="row between"><h2>Sessions</h2><p className="muted">{filtered.length} shown</p></div>
-            <div className="row between">
-              <div className="row">
-                <button onClick={() => setSelectedSessionIds(visibleSessions.map((s) => s.id))}>Select all</button>
-                <button onClick={() => setSelectedSessionIds([])}>Clear selection</button>
-                <span className="muted">{selectedSessionIds.length} selected</span>
-              </div>
-              {selectedSessionIds.length > 0 && (
-                <div className="row">
-                  <button onClick={() => visibleSessions.filter((s) => selectedSessionIds.includes(s.id)).forEach((s) => openTab(s))}>Connect selected</button>
-                  <button onClick={async () => {
-                    const tag = prompt('Tag to add');
-                    if (!tag || !vault) return;
-                    const next = vault.sessions.map((s) => selectedSessionIds.includes(s.id) ? { ...s, tags: Array.from(new Set([...s.tags, tag])) } : s);
-                    await reorderSessions(next);
-                  }}>Add tag</button>
-                  <button onClick={async () => {
-                    if (!vault) return;
-                    if (!confirm(`Delete ${selectedSessionIds.length} sessions?`)) return;
-                    for (const id of selectedSessionIds) await deleteSession(id);
-                    setSelectedSessionIds([]);
-                  }}>Delete selected</button>
-                </div>
-              )}
-            </div>
-            <div
-              className="session-list"
-              role="listbox"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (!visibleSessions.length) return;
-                if (event.key === 'ArrowDown') {
-                  event.preventDefault();
-                  const nextIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 1, visibleSessions.length - 1);
-                  setSelectedSessionId(visibleSessions[nextIndex].id);
-                }
-                if (event.key === 'ArrowUp') {
-                  event.preventDefault();
-                  const nextIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 1, 0);
-                  setSelectedSessionId(visibleSessions[nextIndex].id);
-                }
-                if (event.key === 'Enter' && selectedIndex >= 0) {
-                  event.preventDefault();
-                  openTab(visibleSessions[selectedIndex]).catch(() => undefined);
-                }
-              }}
-            >
+            <div className="session-list compact-list">
               {visibleSessions.map((session) => (
-                <div
-                  className={selectedSessionIds.includes(session.id) ? 'session-row selected' : selectedSessionId === session.id ? 'session-row selected' : 'session-row'}
-                  key={session.id}
-                  draggable
-                  onDragStart={(e) => e.dataTransfer.setData('text/session-id', session.id)}
-                  onClick={(e) => {
-                    setSelectedSessionId(session.id);
-                    if (e.shiftKey && selectedSessionId) {
-                      const start = visibleSessions.findIndex((s) => s.id === selectedSessionId);
-                      const end = visibleSessions.findIndex((s) => s.id === session.id);
-                      const [a,b] = [Math.min(start,end), Math.max(start,end)];
-                      setSelectedSessionIds(Array.from(new Set([...selectedSessionIds, ...visibleSessions.slice(a,b+1).map((s)=>s.id)])));
-                    } else if (e.metaKey || e.ctrlKey) {
-                      setSelectedSessionIds((current) => current.includes(session.id) ? current.filter((id) => id !== session.id) : [...current, session.id]);
-                    } else {
-                      setSelectedSessionIds([session.id]);
-                    }
-                  }}
-                >
+                <div className={selectedSessionId === session.id ? 'session-row selected' : 'session-row'} key={session.id} onClick={() => { setSelectedSessionId(session.id); setSelectedSessionIds([session.id]); }}>
                   <div className="session-primary">
                     <div className="session-icon" title={getSessionMetaLabel(session)}>{resolveSessionIcon(session).startsWith('data:') ? <img className="session-icon-img" src={resolveSessionIcon(session)} alt="session icon" /> : resolveSessionIcon(session)}</div>
                     <div>
                       <strong>{session.name}</strong>
                       <p className="muted">{session.protocol.toUpperCase()} • {session.host}:{session.port}</p>
-                      <div className="row session-badges">
-                        {session.favorite && <span className="session-chip">Favorite</span>}
-                        {session.folderId && <span className="session-chip">{folders.find((f) => f.id === session.folderId)?.name ?? 'Folder'}</span>}
-                        {session.tags.slice(0, 2).map((tag) => <span key={tag} className="session-chip">{tag}</span>)}
-                      </div>
                     </div>
                   </div>
                   <div className="row">
-                    <button onClick={() => openTab(session)}>Connect</button>
-                    <details className="menu">
-                      <summary>⋮</summary>
-                      <div className="menu-panel">
-                        <button onClick={() => { setEditing(session); setShowForm(true); }}>Edit</button>
-                        <button onClick={() => duplicateSession(session)}>Duplicate</button>
-                        <button onClick={() => moveSessionToFolder(session.id, undefined)}>Move to root</button>
-                        {session.protocol === 'rdp' && <button onClick={() => openTab(session)}>Open RDP tab</button>}
-                        <button onClick={() => handleToolbarCommand(session, 'detach')}>Detach</button>
-                        <button onClick={() => deleteSession(session.id)}>Delete</button>
-                      </div>
-                    </details>
+                    <button onClick={(e) => { e.stopPropagation(); openSessionInPane(session).catch(() => undefined); }}>Open</button>
+                    <button onClick={(e) => { e.stopPropagation(); splitFocusedPane('vertical', session).catch(() => undefined); }}>Split right</button>
+                    <button onClick={(e) => { e.stopPropagation(); splitFocusedPane('horizontal', session).catch(() => undefined); }}>Split down</button>
+                    {session.protocol === 'ssh' && <button onClick={(e) => { e.stopPropagation(); openSessionInPane(session).catch(() => undefined); }}>Duplicate view</button>}
                   </div>
                 </div>
               ))}
-              {filtered.length > visibleSessions.length && <p className="muted">Showing first {visibleSessions.length} of {filtered.length} sessions for performance.</p>}
             </div>
           </section>
 
-          {activeTabs.map((session) => renderSessionSurface(session))}
+          <section className="card workspace-shell">
+            <div className="row between workspace-actions">
+              <h3>Workspace</h3>
+              <div className="row">
+                <button onClick={() => splitFocusedPane('vertical').catch(() => undefined)}>Split right</button>
+                <button onClick={() => splitFocusedPane('horizontal').catch(() => undefined)}>Split down</button>
+                <button onClick={() => persistWorkspace({ layout: defaultLayout, viewInstances: [] }).catch(() => undefined)}>Reset layout</button>
+              </div>
+            </div>
+
+            <div className={layout.split === 'horizontal' ? 'pane-grid horizontal' : 'pane-grid'}>
+              {layout.panes.map((pane) => {
+                const activeViewId = pane.activeTabId ?? pane.tabIds[0];
+                const activeSession = getSessionForView(activeViewId);
+                return (
+                  <article
+                    key={pane.id}
+                    className={focusedPaneId === pane.id ? 'workspace-pane focused' : 'workspace-pane'}
+                    style={{ flex: pane.size }}
+                    onClick={() => persistWorkspace({ layout: { ...layout, focusedPaneId: pane.id } }).catch(() => undefined)}
+                  >
+                    <div className="pane-tab-strip">
+                      {pane.tabIds.map((tabId) => {
+                        const session = getSessionForView(tabId);
+                        if (!session) return null;
+                        return (
+                          <button key={tabId} className={tabId === activeViewId ? 'tab-pill active' : 'tab-pill'} onClick={(e) => {
+                            e.stopPropagation();
+                            const panes = layout.panes.map((p) => p.id === pane.id ? { ...p, activeTabId: tabId } : p);
+                            persistWorkspace({ layout: { ...layout, panes, focusedPaneId: pane.id } }).catch(() => undefined);
+                          }}>
+                            {session.name}
+                            <span onClick={(e) => { e.stopPropagation(); closeView(pane, tabId).catch(() => undefined); }}> ×</span>
+                          </button>
+                        );
+                      })}
+                      <button className="pane-close" disabled={layout.panes.length <= 1} onClick={(e) => { e.stopPropagation(); closePane(pane.id).catch(() => undefined); }}>Close pane</button>
+                    </div>
+                    <div className="pane-content">
+                      {activeSession && activeViewId ? renderSessionSurface(activeSession, activeViewId) : <p className="muted">No session in this pane. Open from session list.</p>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
         </main>
       </div>
 
-      {showCredentials && <div className="modal-backdrop" onClick={() => setShowCredentials(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><CredentialManager credentials={credentials} onCreate={async (payload, password) => { const next = await window.api.createCredential(payload, password); setCredentials(next); await addActivity({ eventType: 'credential_created', status: 'ok', message: `Credential created: ${payload.name}` }); }} onUpdate={async (payload, password) => { const next = await window.api.updateCredential(payload, password); setCredentials(next); await addActivity({ eventType: 'credential_updated', status: 'ok', message: `Credential updated: ${payload.name}` }); }} onDelete={async (credentialId) => { const next = await window.api.deleteCredential(credentialId); setCredentials(next); await addActivity({ eventType: 'credential_deleted', status: 'warning', message: 'Credential deleted' }); }} /></div></div>}
-
-      {showActivity && <div className="modal-backdrop" onClick={() => setShowActivity(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><ActivityLogPanel events={vault?.activityLog ?? []} onClear={clearActivity} /><section className="card"><h3>Workspace settings</h3><label className="checkbox-row"><input type="checkbox" checked={workspace?.reopenOnStartup ?? true} onChange={(e)=>updateWorkspace({reopenOnStartup:e.target.checked})} />Reopen previous workspace on startup</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.reconnectOnStartup ?? false} onChange={(e)=>updateWorkspace({reconnectOnStartup:e.target.checked})} />Reconnect previously connected sessions on startup</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.restoreActiveTab ?? true} onChange={(e)=>updateWorkspace({restoreActiveTab:e.target.checked})} />Restore last active tab</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.restoreSidebar ?? true} onChange={(e)=>updateWorkspace({restoreSidebar:e.target.checked})} />Restore sidebar tree state</label></section></div></div>}
-
-      {showTemplates && <div className="modal-backdrop" onClick={() => setShowTemplates(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><section className="card"><div className="row between"><h3>Templates</h3><div className="row"><button onClick={() => { const name = prompt('Template name'); if (!name) return; upsertTemplate({ id: crypto.randomUUID(), name, protocol: 'ssh', defaultPort: 22, favorite: false, order: templates.length }); }}>+ New template</button><button onClick={async () => { const out = prompt('Export full vault path'); if (!out) return; await window.api.exportFullVault(out); }}>Create backup</button><button onClick={async () => { const inp = prompt('Import (merge) vault path'); if (!inp) return; await window.api.importMergeVault(inp); }}>Import merge</button><button onClick={async () => { const inp = prompt('Import (replace) vault path'); if (!inp) return; if (!confirm('Replace current vault with imported file?')) return; await window.api.importReplaceVault(inp); window.location.reload(); }}>Import replace</button></div></div><div className="session-list">{templates.sort((a,b)=>a.order-b.order).map((template)=><div className="session-row" key={template.id}><div><strong>{template.name}</strong><p className="muted">{template.protocol.toUpperCase()} • {template.defaultPort}</p></div><div className="row"><button onClick={()=>upsertTemplate({...template, favorite: !template.favorite})}>{template.favorite?'★':'☆'}</button><button onClick={()=>deleteTemplate(template.id)}>Delete</button></div></div>)}</div></section></div></div>}
+      {showCredentials && <div className="modal-backdrop" onClick={() => setShowCredentials(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><CredentialManager credentials={credentials} onCreate={async (payload, password) => { const next = await window.api.createCredential(payload, password); setCredentials(next); }} onUpdate={async (payload, password) => { const next = await window.api.updateCredential(payload, password); setCredentials(next); }} onDelete={async (credentialId) => { const next = await window.api.deleteCredential(credentialId); setCredentials(next); }} /></div></div>}
+      {showActivity && <div className="modal-backdrop" onClick={() => setShowActivity(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><ActivityLogPanel events={vault?.activityLog ?? []} onClear={clearActivity} /></div></div>}
+      {showTemplates && <div className="modal-backdrop" onClick={() => setShowTemplates(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><section className="card"><div className="row between"><h3>Templates</h3><button onClick={() => { const name = prompt('Template name'); if (!name) return; upsertTemplate({ id: crypto.randomUUID(), name, protocol: 'ssh', defaultPort: 22, favorite: false, order: templates.length }); }}>+ New template</button></div><div className="session-list">{templates.sort((a,b)=>a.order-b.order).map((template)=><div className="session-row" key={template.id}><div><strong>{template.name}</strong><p className="muted">{template.protocol.toUpperCase()} • {template.defaultPort}</p></div><div className="row"><button onClick={()=>upsertTemplate({...template, favorite: !template.favorite})}>{template.favorite?'★':'☆'}</button><button onClick={()=>deleteTemplate(template.id)}>Delete</button></div></div>)}</div></section></div></div>}
 
       {showForm && (
         <div className="modal-backdrop" onClick={() => setShowForm(false)}>
@@ -525,7 +429,7 @@ export function App() {
               onSaveAndConnect={async (session) => {
                 const next = editing ? session : { ...session, folderId: selectedFolderId };
                 await upsertSession(next);
-                await openTab(next);
+                await openSessionInPane(next);
                 setShowForm(false);
                 setEditing(undefined);
               }}
