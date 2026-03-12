@@ -94,6 +94,23 @@ const templateSchema = z.object({
   order: z.number().int()
 });
 
+
+const smartViewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  query: z.string().optional(),
+  protocol: z.enum(['rdp', 'ssh', 'sftp']).optional(),
+  folderId: z.string().optional(),
+  favoritesOnly: z.boolean().optional(),
+  recentOnly: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
+  connectionState: z.enum(['idle', 'connecting', 'connected', 'reconnecting', 'disconnected', 'failed', 'auth_failed', 'timeout']).optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+  pinned: z.boolean(),
+  order: z.number().int()
+});
+
 const activitySchema = z.object({
   id: z.string(),
   timestamp: z.string(),
@@ -115,11 +132,34 @@ export const vaultSchema = z.object({
     selectedFolderId: z.string().optional(),
     autoReconnect: z.boolean().default(false),
     retryCount: z.number().int().default(2),
-    retryDelayMs: z.number().int().default(1000)
+    retryDelayMs: z.number().int().default(1000),
+    workspace: z.object({
+      reopenOnStartup: z.boolean().default(true),
+      reconnectOnStartup: z.boolean().default(false),
+      restoreActiveTab: z.boolean().default(true),
+      restoreSidebar: z.boolean().default(true),
+      openTabIds: z.array(z.string()).default([]),
+      activeTabId: z.string().optional(),
+      detachedSessionIds: z.array(z.string()).default([]),
+      selectedFolderId: z.string().optional(),
+      expandedFolderIds: z.array(z.string()).default([]),
+      searchQuery: z.string().optional(),
+      selectedViewId: z.string().optional(),
+      tabState: z.array(z.object({
+        sessionId: z.string(),
+        displayMode: z.enum(['fit', 'actual', 'stretch', 'fullscreen']).optional(),
+        toolbarVisible: z.boolean().optional(),
+        ssh: z.object({ fontSize: z.number().optional(), wrap: z.boolean().optional() }).optional(),
+        sftp: z.object({ localPath: z.string().optional(), remotePath: z.string().optional() }).optional()
+      })).default([])
+    }).default({
+      reopenOnStartup: true, reconnectOnStartup: false, restoreActiveTab: true, restoreSidebar: true, openTabIds: [], detachedSessionIds: [], expandedFolderIds: [], tabState: []
+    })
   }),
   sessions: z.array(sessionSchema),
   folders: z.array(folderSchema).default([]),
   templates: z.array(templateSchema).default([]),
+  smartViews: z.array(smartViewSchema).default([]),
   activityLog: z.array(activitySchema).default([]),
   credentials: z.array(credentialProfileSchema).default([]),
   encryptedSecrets: z.array(

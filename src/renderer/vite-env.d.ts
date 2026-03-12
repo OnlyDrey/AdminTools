@@ -10,7 +10,11 @@ declare global {
       decryptSecret(id: string, password: string): Promise<string | undefined>;
       encryptSecret(id: string, secret: string, password: string): Promise<void>;
       exportSessions(path: string): Promise<void>;
+      exportFullVault(path: string): Promise<void>;
+      exportSelectedSessions(path: string, sessionIds: string[]): Promise<void>;
       importSessions(path: string): Promise<SessionImportExport>;
+      importMergeVault(path: string): Promise<VaultFile>;
+      importReplaceVault(path: string): Promise<VaultFile>;
       listCredentials(): Promise<CredentialProfile[]>;
       createCredential(payload: Omit<CredentialProfile, 'secretRef'>, password: string): Promise<CredentialProfile[]>;
       updateCredential(payload: CredentialProfile, password?: string): Promise<CredentialProfile[]>;
@@ -18,6 +22,8 @@ declare global {
       resolveCredential(credentialId: string): Promise<{ id: string; username: string; password: string; domain?: string; type: string } | undefined>;
       launchRdp(session: Session): Promise<string>;
       detachSession(session: Session): Promise<boolean>;
+      reattachSession(sessionId: string): Promise<boolean>;
+      listDetachedSessions(): Promise<string[]>;
       sshConnect(sessionId: string, payload: Record<string, unknown>): Promise<boolean>;
       sshOpenShell(sessionId: string): Promise<boolean>;
       sshWrite(sessionId: string, input: string): Promise<boolean>;

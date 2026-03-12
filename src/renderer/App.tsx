@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ConnectionDiagnostic, ConnectionState, CredentialProfile, FolderNode, Session, SessionTemplate } from '../shared/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ConnectionDiagnostic, ConnectionState, CredentialProfile, FolderNode, Session, SessionTemplate, SmartView } from '../shared/types';
 import { ActivityLogPanel } from './components/ActivityLogPanel';
 import { CredentialManager } from './components/CredentialManager';
 import { RemoteSessionToolbar, type RemoteCommand } from './components/RemoteSessionToolbar';
@@ -26,7 +26,10 @@ export function App() {
     reorderSessions,
     upsertTemplate,
     deleteTemplate,
-    clearActivity
+    clearActivity,
+    updateWorkspace,
+    upsertSmartView,
+    deleteSmartView
   } = useVault();
 
   const [search, setSearch] = useState('');
@@ -38,31 +41,42 @@ export function App() {
   const [showCredentials, setShowCredentials] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<Record<string, ConnectionState>>({});
   const [sessionMessages, setSessionMessages] = useState<Record<string, string>>({});
   const [diagnostics, setDiagnostics] = useState<Record<string, ConnectionDiagnostic | undefined>>({});
+  const didRestoreRef = useRef(false);
 
   const sessions = vault?.sessions ?? [];
   const folders = vault?.folders ?? [];
   const templates = vault?.templates ?? [];
   const selectedFolderId = vault?.appSettings.selectedFolderId;
   const expandedFolderIds = vault?.appSettings.expandedFolderIds ?? [];
+  const smartViews = vault?.smartViews ?? [];
+  const workspace = vault?.appSettings.workspace;
 
   useEffect(() => {
     window.api.listCredentials().then(setCredentials).catch(() => setCredentials([]));
   }, [vault?.schemaVersion]);
 
+  const activeView = smartViews.find((v) => v.id === workspace?.selectedViewId);
+
   const filtered = useMemo(() => {
     const byFolder = (session: Session) => {
-      if (!selectedFolderId) return true;
-      return session.folderId === selectedFolderId;
+      const folderScope = activeView?.folderId ?? selectedFolderId;
+      if (!folderScope) return true;
+      return session.folderId === folderScope;
     };
     return sessions.filter((session) => {
+      const queryText = activeView?.query ?? search;
       const query = `${session.name} ${session.host} ${session.tags.join(' ')}`.toLowerCase();
-      return query.includes(search.toLowerCase()) && byFolder(session);
+      if (activeView?.protocol && session.protocol !== activeView.protocol) return false;
+      if (activeView?.favoritesOnly && !session.favorite) return false;
+      if (activeView?.tags?.length && !activeView.tags.every((tag) => session.tags.includes(tag))) return false;
+      return query.includes(queryText.toLowerCase()) && byFolder(session);
     });
-  }, [search, selectedFolderId, sessions]);
+  }, [activeView, search, selectedFolderId, sessions]);
 
   const visibleSessions = useMemo(() => filtered.slice(0, 250), [filtered]);
 
@@ -70,6 +84,7 @@ export function App() {
     setSelectedSessionId(session.id);
     setActiveTabIds((current) => (current.includes(session.id) ? current : [...current, session.id]));
     setSessionStatus((current) => ({ ...current, [session.id]: current[session.id] ?? 'idle' }));
+    updateWorkspace({ openTabIds: Array.from(new Set([...(workspace?.openTabIds ?? []), session.id])), activeTabId: session.id }).catch(() => undefined);
     if (vault && !vault.appSettings.recentSessionIds.includes(session.id)) {
       await save({
         ...vault,
@@ -172,6 +187,17 @@ export function App() {
       <div className="app dark">
         <main className="main">
           <section className="card">
+            <div className="row between"><h3>Smart Views</h3><button onClick={() => updateWorkspace({ selectedViewId: undefined })}>Clear</button></div>
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              {smartViews.sort((a,b)=>a.order-b.order).map((view) => (
+                <button key={view.id} className={workspace?.selectedViewId === view.id ? 'active' : ''} onClick={() => updateWorkspace({ selectedViewId: view.id })}>
+                  {view.icon ?? '🔎'} {view.name}
+                </button>
+              ))}
+              {smartViews.length === 0 && <p className="muted">No saved views yet.</p>}
+            </div>
+          </section>
+          <section className="card">
             <h2>Renderer startup error</h2>
             <p className="muted">{bridgeError}</p>
           </section>
@@ -184,6 +210,40 @@ export function App() {
   const recentSessions = (vault?.appSettings.recentSessionIds ?? []).map((id) => sessions.find((item) => item.id === id)).filter(Boolean) as Session[];
 
   const selectedIndex = visibleSessions.findIndex((s) => s.id === selectedSessionId);
+
+
+  useEffect(() => {
+    if (!workspace?.reopenOnStartup) return;
+    if (didRestoreRef.current) return;
+    const restoredIds = (workspace.openTabIds ?? []).filter((id) => sessions.some((s) => s.id === id));
+    if (restoredIds.length === 0) {
+      didRestoreRef.current = true;
+      return;
+    }
+    setActiveTabIds(restoredIds);
+    if (workspace.restoreActiveTab && workspace.activeTabId) {
+      setSelectedSessionId(workspace.activeTabId);
+    }
+    if (workspace.searchQuery) {
+      setSearch(workspace.searchQuery);
+    }
+    didRestoreRef.current = true;
+    if (workspace.reconnectOnStartup) {
+      restoredIds.forEach((id, index) => {
+        const session = sessions.find((s) => s.id === id);
+        if (!session) return;
+        window.setTimeout(() => {
+          handleToolbarCommand(session, 'reconnect').catch(() => undefined);
+        }, 250 * index);
+      });
+    }
+  }, [workspace, sessions]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    updateWorkspace({ searchQuery: search }).catch(() => undefined);
+  }, [search, updateWorkspace, workspace]);
+
 
   const moveSessionToFolder = async (sessionId: string, folderId?: string) => {
     if (!vault) return;
@@ -198,6 +258,11 @@ export function App() {
         <input id="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search sessions" />
         <div className="row">
           <button onClick={() => setShowActivity(true)}>Activity</button>
+          <button onClick={async () => {
+            const name = prompt('Smart view name');
+            if (!name) return;
+            await upsertSmartView({ id: crypto.randomUUID(), name, query: search, folderId: selectedFolderId, pinned: true, order: smartViews.length });
+          }}>Save view</button>
           <button onClick={() => setShowTemplates(true)}>Templates</button>
           <button onClick={() => setShowCredentials(true)}>Credentials</button>
           <button onClick={() => { setEditing(undefined); setShowForm(true); }}>＋ New Session</button>
@@ -214,10 +279,12 @@ export function App() {
             if (!vault) return;
             const expanded = expandedFolderIds.includes(folderId) ? expandedFolderIds.filter((id) => id !== folderId) : [...expandedFolderIds, folderId];
             await save({ ...vault, appSettings: { ...vault.appSettings, expandedFolderIds: expanded } });
+            await updateWorkspace({ expandedFolderIds: expanded });
           }}
           onSelectFolder={async (folderId) => {
             if (!vault) return;
             await save({ ...vault, appSettings: { ...vault.appSettings, selectedFolderId: folderId } });
+            await updateWorkspace({ selectedFolderId: folderId, selectedViewId: undefined });
           }}
           onNewFolder={(parentId) => {
             const name = prompt('Folder name');
@@ -237,6 +304,17 @@ export function App() {
 
         <main className="main">
           <section className="card">
+            <div className="row between"><h3>Smart Views</h3><button onClick={() => updateWorkspace({ selectedViewId: undefined })}>Clear</button></div>
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              {smartViews.sort((a,b)=>a.order-b.order).map((view) => (
+                <button key={view.id} className={workspace?.selectedViewId === view.id ? 'active' : ''} onClick={() => updateWorkspace({ selectedViewId: view.id })}>
+                  {view.icon ?? '🔎'} {view.name}
+                </button>
+              ))}
+              {smartViews.length === 0 && <p className="muted">No saved views yet.</p>}
+            </div>
+          </section>
+          <section className="card">
             <div className="row between"><h3>Session Tabs</h3></div>
             <div className="tab-strip">
               {activeTabs.length === 0 && <p className="muted">No open tabs yet. Open a session from the list.</p>}
@@ -251,6 +329,30 @@ export function App() {
 
           <section className="card">
             <div className="row between"><h2>Sessions</h2><p className="muted">{filtered.length} shown</p></div>
+            <div className="row between">
+              <div className="row">
+                <button onClick={() => setSelectedSessionIds(visibleSessions.map((s) => s.id))}>Select all</button>
+                <button onClick={() => setSelectedSessionIds([])}>Clear selection</button>
+                <span className="muted">{selectedSessionIds.length} selected</span>
+              </div>
+              {selectedSessionIds.length > 0 && (
+                <div className="row">
+                  <button onClick={() => visibleSessions.filter((s) => selectedSessionIds.includes(s.id)).forEach((s) => openTab(s))}>Connect selected</button>
+                  <button onClick={async () => {
+                    const tag = prompt('Tag to add');
+                    if (!tag || !vault) return;
+                    const next = vault.sessions.map((s) => selectedSessionIds.includes(s.id) ? { ...s, tags: Array.from(new Set([...s.tags, tag])) } : s);
+                    await reorderSessions(next);
+                  }}>Add tag</button>
+                  <button onClick={async () => {
+                    if (!vault) return;
+                    if (!confirm(`Delete ${selectedSessionIds.length} sessions?`)) return;
+                    for (const id of selectedSessionIds) await deleteSession(id);
+                    setSelectedSessionIds([]);
+                  }}>Delete selected</button>
+                </div>
+              )}
+            </div>
             <div
               className="session-list"
               role="listbox"
@@ -275,11 +377,23 @@ export function App() {
             >
               {visibleSessions.map((session) => (
                 <div
-                  className={selectedSessionId === session.id ? 'session-row selected' : 'session-row'}
+                  className={selectedSessionIds.includes(session.id) ? 'session-row selected' : selectedSessionId === session.id ? 'session-row selected' : 'session-row'}
                   key={session.id}
                   draggable
                   onDragStart={(e) => e.dataTransfer.setData('text/session-id', session.id)}
-                  onClick={() => setSelectedSessionId(session.id)}
+                  onClick={(e) => {
+                    setSelectedSessionId(session.id);
+                    if (e.shiftKey && selectedSessionId) {
+                      const start = visibleSessions.findIndex((s) => s.id === selectedSessionId);
+                      const end = visibleSessions.findIndex((s) => s.id === session.id);
+                      const [a,b] = [Math.min(start,end), Math.max(start,end)];
+                      setSelectedSessionIds(Array.from(new Set([...selectedSessionIds, ...visibleSessions.slice(a,b+1).map((s)=>s.id)])));
+                    } else if (e.metaKey || e.ctrlKey) {
+                      setSelectedSessionIds((current) => current.includes(session.id) ? current.filter((id) => id !== session.id) : [...current, session.id]);
+                    } else {
+                      setSelectedSessionIds([session.id]);
+                    }
+                  }}
                 >
                   <div className="session-primary">
                     <div className="session-icon" title={getSessionMetaLabel(session)}>{resolveSessionIcon(session).startsWith('data:') ? <img className="session-icon-img" src={resolveSessionIcon(session)} alt="session icon" /> : resolveSessionIcon(session)}</div>
@@ -330,9 +444,9 @@ export function App() {
 
       {showCredentials && <div className="modal-backdrop" onClick={() => setShowCredentials(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><CredentialManager credentials={credentials} onCreate={async (payload, password) => { const next = await window.api.createCredential(payload, password); setCredentials(next); await addActivity({ eventType: 'credential_created', status: 'ok', message: `Credential created: ${payload.name}` }); }} onUpdate={async (payload, password) => { const next = await window.api.updateCredential(payload, password); setCredentials(next); await addActivity({ eventType: 'credential_updated', status: 'ok', message: `Credential updated: ${payload.name}` }); }} onDelete={async (credentialId) => { const next = await window.api.deleteCredential(credentialId); setCredentials(next); await addActivity({ eventType: 'credential_deleted', status: 'warning', message: 'Credential deleted' }); }} /></div></div>}
 
-      {showActivity && <div className="modal-backdrop" onClick={() => setShowActivity(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><ActivityLogPanel events={vault?.activityLog ?? []} onClear={clearActivity} /></div></div>}
+      {showActivity && <div className="modal-backdrop" onClick={() => setShowActivity(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><ActivityLogPanel events={vault?.activityLog ?? []} onClear={clearActivity} /><section className="card"><h3>Workspace settings</h3><label className="checkbox-row"><input type="checkbox" checked={workspace?.reopenOnStartup ?? true} onChange={(e)=>updateWorkspace({reopenOnStartup:e.target.checked})} />Reopen previous workspace on startup</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.reconnectOnStartup ?? false} onChange={(e)=>updateWorkspace({reconnectOnStartup:e.target.checked})} />Reconnect previously connected sessions on startup</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.restoreActiveTab ?? true} onChange={(e)=>updateWorkspace({restoreActiveTab:e.target.checked})} />Restore last active tab</label><label className="checkbox-row"><input type="checkbox" checked={workspace?.restoreSidebar ?? true} onChange={(e)=>updateWorkspace({restoreSidebar:e.target.checked})} />Restore sidebar tree state</label></section></div></div>}
 
-      {showTemplates && <div className="modal-backdrop" onClick={() => setShowTemplates(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><section className="card"><div className="row between"><h3>Templates</h3><button onClick={() => { const name = prompt('Template name'); if (!name) return; upsertTemplate({ id: crypto.randomUUID(), name, protocol: 'ssh', defaultPort: 22, favorite: false, order: templates.length }); }}>+ New template</button></div><div className="session-list">{templates.sort((a,b)=>a.order-b.order).map((template)=><div className="session-row" key={template.id}><div><strong>{template.name}</strong><p className="muted">{template.protocol.toUpperCase()} • {template.defaultPort}</p></div><div className="row"><button onClick={()=>upsertTemplate({...template, favorite: !template.favorite})}>{template.favorite?'★':'☆'}</button><button onClick={()=>deleteTemplate(template.id)}>Delete</button></div></div>)}</div></section></div></div>}
+      {showTemplates && <div className="modal-backdrop" onClick={() => setShowTemplates(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><section className="card"><div className="row between"><h3>Templates</h3><div className="row"><button onClick={() => { const name = prompt('Template name'); if (!name) return; upsertTemplate({ id: crypto.randomUUID(), name, protocol: 'ssh', defaultPort: 22, favorite: false, order: templates.length }); }}>+ New template</button><button onClick={async () => { const out = prompt('Export full vault path'); if (!out) return; await window.api.exportFullVault(out); }}>Create backup</button><button onClick={async () => { const inp = prompt('Import (merge) vault path'); if (!inp) return; await window.api.importMergeVault(inp); }}>Import merge</button><button onClick={async () => { const inp = prompt('Import (replace) vault path'); if (!inp) return; if (!confirm('Replace current vault with imported file?')) return; await window.api.importReplaceVault(inp); window.location.reload(); }}>Import replace</button></div></div><div className="session-list">{templates.sort((a,b)=>a.order-b.order).map((template)=><div className="session-row" key={template.id}><div><strong>{template.name}</strong><p className="muted">{template.protocol.toUpperCase()} • {template.defaultPort}</p></div><div className="row"><button onClick={()=>upsertTemplate({...template, favorite: !template.favorite})}>{template.favorite?'★':'☆'}</button><button onClick={()=>deleteTemplate(template.id)}>Delete</button></div></div>)}</div></section></div></div>}
 
       {showForm && (
         <div className="modal-backdrop" onClick={() => setShowForm(false)}>

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import fsp from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,7 @@ const __dirname = path.dirname(__filename);
 let mainWindow: BrowserWindow | null = null;
 let inMemoryVault: VaultFile | null = null;
 let masterPassword = '';
+const detachedWindows = new Map<string, BrowserWindow>();
 
 function createWindow(route = '/') {
   const win = new BrowserWindow({
@@ -109,11 +111,50 @@ ipcMain.handle('vault:export', async (_event, exportPath: string) => {
   await exportSessions(inMemoryVault, exportPath);
 });
 
+ipcMain.handle('vault:export-full', async (_event, exportPath: string) => {
+  if (!inMemoryVault) throw new Error('Vault not loaded');
+  const safeExport = { ...inMemoryVault, encryptedSecrets: [], credentials: inMemoryVault.credentials.map((c) => ({ ...c, secretRef: 'REQUIRES_REENTRY' })) };
+  await fsp.writeFile(exportPath, JSON.stringify(safeExport, null, 2), 'utf-8');
+});
+
+ipcMain.handle('vault:export-selected-sessions', async (_event, exportPath: string, sessionIds: string[]) => {
+  if (!inMemoryVault) throw new Error('Vault not loaded');
+  const sessions = inMemoryVault.sessions.filter((s) => sessionIds.includes(s.id));
+  await fsp.writeFile(exportPath, JSON.stringify({ schemaVersion: inMemoryVault.schemaVersion, sessions }, null, 2), 'utf-8');
+});
+
 ipcMain.handle('vault:import', async (_event, filePath: string) => {
   if (!inMemoryVault) throw new Error('Vault not loaded');
   await importSessions(inMemoryVault, filePath);
   await saveVault(inMemoryVault);
   return { schemaVersion: inMemoryVault.schemaVersion, sessions: inMemoryVault.sessions };
+});
+
+ipcMain.handle('vault:import-merge', async (_event, filePath: string) => {
+  if (!inMemoryVault) throw new Error('Vault not loaded');
+  const vault = inMemoryVault;
+  const raw = await fsp.readFile(filePath, 'utf-8');
+  const parsed = JSON.parse(raw) as Partial<VaultFile>;
+  const incomingSessions = parsed.sessions ?? [];
+  const merged = [...vault.sessions];
+  for (const session of incomingSessions) {
+    const exists = merged.find((s) => s.id === session.id);
+    if (!exists) merged.push(session as Session);
+  }
+  vault.sessions = merged;
+  vault.templates = [...(vault.templates ?? []), ...((parsed.templates ?? []).filter((t) => !(vault.templates ?? []).some((e) => e.id === t.id)))];
+  vault.folders = [...(vault.folders ?? []), ...((parsed.folders ?? []).filter((f) => !(vault.folders ?? []).some((e) => e.id === f.id)))];
+  inMemoryVault = vault;
+  await saveVault(vault);
+  return vault;
+});
+
+ipcMain.handle('vault:import-replace', async (_event, filePath: string) => {
+  const raw = await fsp.readFile(filePath, 'utf-8');
+  const parsed = JSON.parse(raw) as VaultFile;
+  inMemoryVault = parsed;
+  await saveVault(parsed);
+  return parsed;
 });
 
 
@@ -185,9 +226,32 @@ ipcMain.handle('rdp:launch', async (_event, session: Session) => {
 });
 
 ipcMain.handle('window:detach', (_event, session: Session) => {
-  createWindow(`/detached/${session.id}`);
+  const existing = detachedWindows.get(session.id);
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return true;
+  }
+  const win = createWindow(`/detached/${session.id}`);
+  detachedWindows.set(session.id, win);
+  win.on('closed', () => {
+    detachedWindows.delete(session.id);
+  });
   return true;
 });
+
+ipcMain.handle('window:reattach', (_event, sessionId: string) => {
+  const win = detachedWindows.get(sessionId);
+  if (win && !win.isDestroyed()) {
+    win.close();
+  }
+  detachedWindows.delete(sessionId);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+  }
+  return true;
+});
+
+ipcMain.handle('window:list-detached', () => Array.from(detachedWindows.keys()));
 
 ipcMain.handle('ssh:connect', async (_event, sessionId: string, payload: Parameters<typeof connectSsh>[1]) => {
   await connectSsh(sessionId, payload);

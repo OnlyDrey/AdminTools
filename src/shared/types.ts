@@ -50,6 +50,46 @@ export interface ConnectionDiagnostic {
   message: string;
 }
 
+
+export interface WorkspaceTabState {
+  sessionId: string;
+  displayMode?: 'fit' | 'actual' | 'stretch' | 'fullscreen';
+  toolbarVisible?: boolean;
+  ssh?: { fontSize?: number; wrap?: boolean };
+  sftp?: { localPath?: string; remotePath?: string };
+}
+
+export interface WorkspaceState {
+  reopenOnStartup: boolean;
+  reconnectOnStartup: boolean;
+  restoreActiveTab: boolean;
+  restoreSidebar: boolean;
+  openTabIds: string[];
+  activeTabId?: string;
+  detachedSessionIds: string[];
+  selectedFolderId?: string;
+  expandedFolderIds: string[];
+  searchQuery?: string;
+  selectedViewId?: string;
+  tabState: WorkspaceTabState[];
+}
+
+export interface SmartView {
+  id: string;
+  name: string;
+  query?: string;
+  protocol?: Protocol;
+  folderId?: string;
+  favoritesOnly?: boolean;
+  recentOnly?: boolean;
+  tags?: string[];
+  connectionState?: ConnectionState;
+  color?: string;
+  icon?: string;
+  pinned: boolean;
+  order: number;
+}
+
 export interface CredentialProfile {
   id: string;
   name: string;
@@ -126,6 +166,7 @@ export interface AppSettings {
   autoReconnect: boolean;
   retryCount: number;
   retryDelayMs: number;
+  workspace: WorkspaceState;
 }
 
 export interface SecretEntry {
@@ -141,6 +182,7 @@ export interface VaultFile {
   sessions: Session[];
   folders: FolderNode[];
   templates: SessionTemplate[];
+  smartViews: SmartView[];
   activityLog: ActivityEvent[];
   credentials: CredentialProfile[];
   encryptedSecrets: SecretEntry[];

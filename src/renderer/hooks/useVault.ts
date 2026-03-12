@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_SETTINGS } from '../../shared/constants';
-import type { ActivityEvent, FolderNode, Session, SessionTemplate, VaultFile } from '../../shared/types';
+import type { ActivityEvent, FolderNode, Session, SessionTemplate, SmartView, VaultFile, WorkspaceState } from '../../shared/types';
 import { seedSessions } from '../seed';
 
 const ACTIVITY_RETENTION = 500;
@@ -29,7 +29,9 @@ export function useVault() {
         loaded.appSettings = { ...DEFAULT_SETTINGS, ...(loaded.appSettings ?? {}) };
         loaded.folders = ensureFolders(loaded);
         loaded.templates = loaded.templates ?? [];
+        loaded.smartViews = loaded.smartViews ?? [];
         loaded.activityLog = loaded.activityLog ?? [];
+        loaded.appSettings.workspace = loaded.appSettings.workspace ?? DEFAULT_SETTINGS.workspace;
         setVault(loaded);
       })
       .catch((error: unknown) => {
@@ -122,6 +124,31 @@ export function useVault() {
     await save({ ...vault, activityLog: [] });
   };
 
+
+  const updateWorkspace = async (workspacePatch: Partial<WorkspaceState>) => {
+    if (!vault) return;
+    await save({
+      ...vault,
+      appSettings: {
+        ...vault.appSettings,
+        workspace: { ...vault.appSettings.workspace, ...workspacePatch }
+      }
+    });
+  };
+
+  const upsertSmartView = async (view: SmartView) => {
+    if (!vault) return;
+    const exists = vault.smartViews.find((item) => item.id === view.id);
+    const smartViews = exists ? vault.smartViews.map((item) => (item.id === view.id ? view : item)) : [...vault.smartViews, view];
+    await save({ ...vault, smartViews });
+  };
+
+  const deleteSmartView = async (viewId: string) => {
+    if (!vault) return;
+    await save({ ...vault, smartViews: vault.smartViews.filter((item) => item.id !== viewId) });
+  };
+
+
   return {
     vault,
     masterPassword,
@@ -138,6 +165,9 @@ export function useVault() {
     reorderSessions,
     upsertTemplate,
     deleteTemplate,
-    clearActivity
+    clearActivity,
+    updateWorkspace,
+    upsertSmartView,
+    deleteSmartView
   };
 }

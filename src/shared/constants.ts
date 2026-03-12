@@ -11,7 +11,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   selectedFolderId: undefined,
   autoReconnect: false,
   retryCount: 2,
-  retryDelayMs: 1000
+  retryDelayMs: 1000,
+  workspace: {
+    reopenOnStartup: true,
+    reconnectOnStartup: false,
+    restoreActiveTab: true,
+    restoreSidebar: true,
+    openTabIds: [],
+    activeTabId: undefined,
+    detachedSessionIds: [],
+    selectedFolderId: undefined,
+    expandedFolderIds: [],
+    searchQuery: '',
+    selectedViewId: undefined,
+    tabState: []
+  }
 };
 
 export const EMPTY_VAULT: VaultFile = {
@@ -20,6 +34,7 @@ export const EMPTY_VAULT: VaultFile = {
   sessions: [],
   folders: [],
   templates: [],
+  smartViews: [],
   activityLog: [],
   credentials: [],
   encryptedSecrets: [],
