@@ -4,9 +4,10 @@ import { CredentialManager } from './components/CredentialManager';
 import { RemoteSessionToolbar, type RemoteCommand } from './components/RemoteSessionToolbar';
 import { SessionForm } from './components/SessionForm';
 import { RemoteView } from './components/RemoteView';
-import { SftpBrowser } from './components/SftpBrowser';
-import { SshTerminal } from './components/SshTerminal';
+import { SftpExplorerView } from './components/SftpExplorerView';
+import { SshTerminalView } from './components/SshTerminalView';
 import { useVault } from './hooks/useVault';
+import { routeRemoteCommand } from './remoteCommandRouter';
 import { getSessionMetaLabel, resolveSessionIcon } from './sessionIcons';
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
@@ -72,8 +73,8 @@ export function App() {
   };
 
   const handleToolbarCommand = async (session: Session, command: RemoteCommand) => {
-    switch (command) {
-      case 'reconnect': {
+    await routeRemoteCommand(session, command, {
+      reconnect: async () => {
         setSessionStatus((current) => ({ ...current, [session.id]: 'connecting' }));
         if (session.protocol === 'rdp') {
           await window.api.launchRdp(session).catch(() => undefined);
@@ -82,39 +83,25 @@ export function App() {
           setSessionStatus((current) => ({ ...current, [session.id]: 'connected' }));
         }, 350);
         setToast(session.id, 'Reconnect triggered');
-        return;
-      }
-      case 'disconnect': {
+      },
+      disconnect: async () => {
         setSessionStatus((current) => ({ ...current, [session.id]: 'disconnected' }));
         setToast(session.id, 'Session marked as disconnected');
-        return;
-      }
-      case 'detach': {
+      },
+      detach: async () => {
         await window.api.detachSession(session);
         setToast(session.id, 'Detached to new window');
-        return;
-      }
-      case 'fullscreen-toggle':
-      case 'fit-window':
-      case 'scale-100':
-      case 'send-clipboard':
-      case 'sync-clipboard':
-      case 'send-ctrl-alt-del':
-      case 'send-ctrl-esc':
-      case 'send-win':
-      case 'send-alt-tab':
-      case 'open-task-manager':
-      case 'lock-workstation': {
-        setToast(session.id, `${command} command sent`);
-        return;
-      }
-      default:
-        return;
-    }
+      },
+      feedback: (message) => setToast(session.id, message)
+    });
   };
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-terminal-input="true"]')) {
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         document.getElementById('quick-connect')?.focus();
@@ -284,8 +271,8 @@ export function App() {
               />
               {sessionMessages[session.id] && <p className="muted remote-toast">{sessionMessages[session.id]}</p>}
               <RemoteView session={session}>
-                {session.protocol === 'ssh' && <SshTerminal title={session.name} />}
-                {session.protocol === 'sftp' && <SftpBrowser session={session} />}
+                {session.protocol === 'ssh' && <SshTerminalView session={session} />}
+                {session.protocol === 'sftp' && <SftpExplorerView session={session} />}
                 {session.protocol === 'rdp' && (
                   <div>
                     <p>RDP sessions launch in system client in MVP.</p>

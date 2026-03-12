@@ -8,7 +8,19 @@ import {
   closeSftp,
   connectSftp,
   connectSsh,
-  listSftp
+  deleteLocal,
+  disconnectSsh,
+  listLocal,
+  listSftp,
+  mkdirLocal,
+  openShell,
+  renameLocal,
+  sftpDelete,
+  sftpDownload,
+  sftpMkdir,
+  sftpRename,
+  sftpUpload,
+  writeShell
 } from './sshService.js';
 import {
   decryptSecret,
@@ -190,6 +202,69 @@ ipcMain.handle('sftp:connect', async (_event, sessionId: string, payload: Parame
 ipcMain.handle('sftp:list', async (_event, sessionId: string, remotePath: string) => {
   return listSftp(sessionId, remotePath);
 });
+
+
+ipcMain.handle('ssh:open-shell', async (event, sessionId: string) => {
+  await openShell(sessionId, (data) => {
+    event.sender.send(`ssh:data:${sessionId}`, data);
+  });
+  return true;
+});
+
+ipcMain.handle('ssh:write', async (_event, sessionId: string, input: string) => {
+  await writeShell(sessionId, input);
+  return true;
+});
+
+ipcMain.handle('ssh:disconnect', async (_event, sessionId: string) => {
+  await disconnectSsh(sessionId);
+  return true;
+});
+
+ipcMain.handle('sftp:upload', async (_event, sessionId: string, localPath: string, remotePath: string) => {
+  await sftpUpload(sessionId, localPath, remotePath);
+  return true;
+});
+
+ipcMain.handle('sftp:download', async (_event, sessionId: string, remotePath: string, localPath: string) => {
+  await sftpDownload(sessionId, remotePath, localPath);
+  return true;
+});
+
+ipcMain.handle('sftp:rename', async (_event, sessionId: string, fromPath: string, toPath: string) => {
+  await sftpRename(sessionId, fromPath, toPath);
+  return true;
+});
+
+ipcMain.handle('sftp:delete', async (_event, sessionId: string, targetPath: string, isDirectory: boolean) => {
+  await sftpDelete(sessionId, targetPath, isDirectory);
+  return true;
+});
+
+ipcMain.handle('sftp:mkdir', async (_event, sessionId: string, targetPath: string) => {
+  await sftpMkdir(sessionId, targetPath);
+  return true;
+});
+
+ipcMain.handle('localfs:list', async (_event, localPath: string) => {
+  return listLocal(localPath);
+});
+
+ipcMain.handle('localfs:mkdir', async (_event, targetPath: string) => {
+  await mkdirLocal(targetPath);
+  return true;
+});
+
+ipcMain.handle('localfs:rename', async (_event, fromPath: string, toPath: string) => {
+  await renameLocal(fromPath, toPath);
+  return true;
+});
+
+ipcMain.handle('localfs:delete', async (_event, targetPath: string, isDirectory: boolean) => {
+  await deleteLocal(targetPath, isDirectory);
+  return true;
+});
+
 
 app.on('before-quit', async () => {
   if (inMemoryVault?.sessions) {

@@ -16,6 +16,24 @@ contextBridge.exposeInMainWorld('api', {
   launchRdp: (session: Session) => ipcRenderer.invoke('rdp:launch', session),
   detachSession: (session: Session) => ipcRenderer.invoke('window:detach', session),
   sshConnect: (sessionId: string, payload: Record<string, unknown>) => ipcRenderer.invoke('ssh:connect', sessionId, payload),
+  sshOpenShell: (sessionId: string) => ipcRenderer.invoke('ssh:open-shell', sessionId) as Promise<boolean>,
+  sshWrite: (sessionId: string, input: string) => ipcRenderer.invoke('ssh:write', sessionId, input) as Promise<boolean>,
+  sshDisconnect: (sessionId: string) => ipcRenderer.invoke('ssh:disconnect', sessionId) as Promise<boolean>,
+  onSshData: (sessionId: string, callback: (data: string) => void) => {
+    const channel = `ssh:data:${sessionId}`;
+    const listener = (_event: Electron.IpcRendererEvent, data: string) => callback(data);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
   sftpConnect: (sessionId: string, payload: Record<string, unknown>) => ipcRenderer.invoke('sftp:connect', sessionId, payload),
-  sftpList: (sessionId: string, remotePath: string) => ipcRenderer.invoke('sftp:list', sessionId, remotePath) as Promise<SftpEntry[]>
+  sftpList: (sessionId: string, remotePath: string) => ipcRenderer.invoke('sftp:list', sessionId, remotePath) as Promise<SftpEntry[]>,
+  sftpUpload: (sessionId: string, localPath: string, remotePath: string) => ipcRenderer.invoke('sftp:upload', sessionId, localPath, remotePath) as Promise<boolean>,
+  sftpDownload: (sessionId: string, remotePath: string, localPath: string) => ipcRenderer.invoke('sftp:download', sessionId, remotePath, localPath) as Promise<boolean>,
+  sftpRename: (sessionId: string, fromPath: string, toPath: string) => ipcRenderer.invoke('sftp:rename', sessionId, fromPath, toPath) as Promise<boolean>,
+  sftpDelete: (sessionId: string, targetPath: string, isDirectory: boolean) => ipcRenderer.invoke('sftp:delete', sessionId, targetPath, isDirectory) as Promise<boolean>,
+  sftpMkdir: (sessionId: string, targetPath: string) => ipcRenderer.invoke('sftp:mkdir', sessionId, targetPath) as Promise<boolean>,
+  localfsList: (localPath: string) => ipcRenderer.invoke('localfs:list', localPath) as Promise<SftpEntry[]>,
+  localfsMkdir: (targetPath: string) => ipcRenderer.invoke('localfs:mkdir', targetPath) as Promise<boolean>,
+  localfsRename: (fromPath: string, toPath: string) => ipcRenderer.invoke('localfs:rename', fromPath, toPath) as Promise<boolean>,
+  localfsDelete: (targetPath: string, isDirectory: boolean) => ipcRenderer.invoke('localfs:delete', targetPath, isDirectory) as Promise<boolean>
 });

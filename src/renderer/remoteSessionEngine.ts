@@ -6,6 +6,8 @@ export type DisplayMode = 'fit' | 'actual' | 'stretch' | 'fullscreen';
 export interface RemoteSessionEngine {
   readonly protocol: EngineProtocol;
   readonly supportsDynamicResize: boolean;
+  readonly supportsEmbeddedSurface: boolean;
+  readonly supportsKeyInjection: boolean;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   resize(width: number, height: number): Promise<void>;
@@ -16,10 +18,14 @@ export interface RemoteSessionEngine {
 class BaseEngine implements RemoteSessionEngine {
   readonly protocol: EngineProtocol;
   readonly supportsDynamicResize: boolean;
+  readonly supportsEmbeddedSurface: boolean;
+  readonly supportsKeyInjection: boolean;
 
-  constructor(protocol: EngineProtocol, supportsDynamicResize: boolean) {
+  constructor(protocol: EngineProtocol, capabilities?: Partial<Pick<RemoteSessionEngine, 'supportsDynamicResize' | 'supportsEmbeddedSurface' | 'supportsKeyInjection'>>) {
     this.protocol = protocol;
-    this.supportsDynamicResize = supportsDynamicResize;
+    this.supportsDynamicResize = capabilities?.supportsDynamicResize ?? false;
+    this.supportsEmbeddedSurface = capabilities?.supportsEmbeddedSurface ?? false;
+    this.supportsKeyInjection = capabilities?.supportsKeyInjection ?? false;
   }
 
   async connect() {
@@ -48,7 +54,11 @@ class RdpEngine extends BaseEngine {
   private readonly session: Session;
 
   constructor(session: Session) {
-    super('rdp', false);
+    super('rdp', {
+      supportsDynamicResize: false,
+      supportsEmbeddedSurface: false,
+      supportsKeyInjection: false
+    });
     this.session = session;
   }
 
@@ -65,19 +75,31 @@ class RdpEngine extends BaseEngine {
 
 class SshEngine extends BaseEngine {
   constructor() {
-    super('ssh', true);
+    super('ssh', {
+      supportsDynamicResize: true,
+      supportsEmbeddedSurface: true,
+      supportsKeyInjection: true
+    });
   }
 }
 
 class SftpEngine extends BaseEngine {
   constructor() {
-    super('sftp', true);
+    super('sftp', {
+      supportsDynamicResize: true,
+      supportsEmbeddedSurface: true,
+      supportsKeyInjection: false
+    });
   }
 }
 
 class VncEngine extends BaseEngine {
   constructor() {
-    super('vnc', true);
+    super('vnc', {
+      supportsDynamicResize: true,
+      supportsEmbeddedSurface: false,
+      supportsKeyInjection: false
+    });
   }
 }
 

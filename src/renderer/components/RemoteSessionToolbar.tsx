@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Protocol, Session } from '../../shared/types';
+import type { Session } from '../../shared/types';
+import { resolveCommandCapability } from '../remoteCommandRouter';
 import { getSessionMetaLabel, resolveSessionIcon } from '../sessionIcons';
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
@@ -18,7 +19,13 @@ export type RemoteCommand =
   | 'scale-100'
   | 'send-clipboard'
   | 'sync-clipboard'
-  | 'detach';
+  | 'detach'
+  | 'copy'
+  | 'paste'
+  | 'clear'
+  | 'new-terminal-tab'
+  | 'toggle-wrap'
+  | 'download-transcript';
 
 interface RemoteSessionToolbarProps {
   session: Session;
@@ -33,7 +40,7 @@ interface CommandDef {
   shortcut?: string;
 }
 
-const quickCommands: CommandDef[] = [
+const baseQuickCommands: CommandDef[] = [
   { id: 'send-ctrl-alt-del', label: 'Send Ctrl+Alt+Del', icon: '🧷', shortcut: 'Ctrl+Shift+End' },
   { id: 'send-ctrl-esc', label: 'Send Ctrl+Esc', icon: '⎋' },
   { id: 'send-win', label: 'Send Win key', icon: '⊞' },
@@ -42,6 +49,15 @@ const quickCommands: CommandDef[] = [
   { id: 'lock-workstation', label: 'Lock workstation', icon: '🔒' },
   { id: 'send-clipboard', label: 'Send clipboard', icon: '📎' },
   { id: 'sync-clipboard', label: 'Sync clipboard toggle', icon: '🔁' }
+];
+
+const sshQuickCommands: CommandDef[] = [
+  { id: 'copy', label: 'Copy', icon: '📄' },
+  { id: 'paste', label: 'Paste', icon: '📋' },
+  { id: 'clear', label: 'Clear terminal', icon: '🧹' },
+  { id: 'new-terminal-tab', label: 'New terminal tab', icon: '➕' },
+  { id: 'toggle-wrap', label: 'Toggle wrap', icon: '↩' },
+  { id: 'download-transcript', label: 'Download transcript', icon: '⬇' }
 ];
 
 const viewCommands: CommandDef[] = [
@@ -53,19 +69,6 @@ const viewCommands: CommandDef[] = [
   { id: 'detach', label: 'Detach session', icon: '↗' }
 ];
 
-function supportsCommand(protocol: Protocol, command: RemoteCommand) {
-  if (protocol === 'rdp') {
-    return true;
-  }
-  if (protocol === 'ssh') {
-    return ['reconnect', 'disconnect', 'fullscreen-toggle', 'fit-window', 'scale-100', 'detach', 'send-clipboard', 'sync-clipboard'].includes(command);
-  }
-  if (protocol === 'sftp') {
-    return ['reconnect', 'disconnect', 'fullscreen-toggle', 'fit-window', 'scale-100', 'detach', 'send-clipboard', 'sync-clipboard'].includes(command);
-  }
-  return false;
-}
-
 export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessionToolbarProps) {
   const [hovering, setHovering] = useState(false);
   const [lastInteraction, setLastInteraction] = useState(Date.now());
@@ -76,6 +79,7 @@ export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessi
     return () => window.clearInterval(id);
   }, []);
 
+  const quickCommands = session.protocol === 'ssh' ? sshQuickCommands : baseQuickCommands;
   const isVisible = useMemo(() => hovering || now - lastInteraction < 2500, [hovering, lastInteraction, now]);
 
   useEffect(() => {
@@ -111,12 +115,12 @@ export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessi
 
       <div className="remote-toolbar center">
         {quickCommands.map((command) => {
-          const supported = supportsCommand(session.protocol, command.id);
+          const capability = resolveCommandCapability(session, command.id);
           return (
             <button
               key={command.id}
-              disabled={!supported}
-              title={`${command.label}${command.shortcut ? ` (${command.shortcut})` : ''}${supported ? '' : ' (unsupported for protocol)'}`}
+              disabled={!capability.enabled}
+              title={`${command.label}${command.shortcut ? ` (${command.shortcut})` : ''}${capability.enabled ? '' : ` (${capability.reason})`}`}
               onClick={() => {
                 onCommand(command.id);
                 setLastInteraction(Date.now());
@@ -130,12 +134,12 @@ export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessi
 
       <div className="remote-toolbar right">
         {viewCommands.map((command) => {
-          const supported = supportsCommand(session.protocol, command.id);
+          const capability = resolveCommandCapability(session, command.id);
           return (
             <button
               key={command.id}
-              disabled={!supported}
-              title={`${command.label}${supported ? '' : ' (unsupported for protocol)'}`}
+              disabled={!capability.enabled}
+              title={`${command.label}${capability.enabled ? '' : ` (${capability.reason})`}`}
               onClick={() => {
                 onCommand(command.id);
                 setLastInteraction(Date.now());
