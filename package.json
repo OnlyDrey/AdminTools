@@ -1,0 +1,51 @@
+{
+  "name": "admintools",
+  "version": "0.1.0",
+  "description": "AdminTools - modern remote session manager",
+  "main": "build/main/main.js",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "preinstall": "node -e \"const [maj,min]=process.versions.node.split('.').map(Number); const ok=(maj>22)||(maj===22&&min>=12); if(!ok){console.error('AdminTools requires Node >=22.12. Current: '+process.versions.node); process.exit(1);} console.log('Node version OK: '+process.versions.node);\"",
+    "clean": "node -e \"const fs=require('fs'); for (const p of ['build']) fs.rmSync(p,{recursive:true,force:true});\"",
+    "dev": "concurrently -k \"tsc -p tsconfig.main.json --watch\" \"vite\" \"wait-on tcp:5173 build/main/main.js build/main/preload.cjs && electron .\"",
+    "build": "npm run clean && npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "repair:env": "powershell -ExecutionPolicy Bypass -File .\\scripts\\repair-env.ps1",
+    "check:network-env": "powershell -ExecutionPolicy Bypass -File .\\scripts\\check-network-env.ps1"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "ajv": "^8.17.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ssh2": "^1.15.0",
+    "ssh2-sftp-client": "^11.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@types/ssh2": "^1.15.5",
+    "@types/ssh2-sftp-client": "^9.0.5",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.1.0",
+    "electron": "31.7.7",
+    "eslint": "^9.15.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.11",
+    "wait-on": "^8.0.1"
+  }
+}
