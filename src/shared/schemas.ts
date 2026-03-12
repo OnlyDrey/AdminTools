@@ -13,6 +13,10 @@ const baseSession = z.object({
   favorite: z.boolean(),
   colorLabel: z.string().optional(),
   notes: z.string().optional(),
+  osType: z.enum(['windows', 'linux', 'network', 'hypervisor', 'server', 'unknown']).optional(),
+  iconMode: z.enum(['auto', 'custom']).optional(),
+  customIcon: z.string().optional(),
+  uploadedIconDataUrl: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -49,6 +53,18 @@ const sftpSession = baseSession.extend({
 
 export const sessionSchema = z.discriminatedUnion('protocol', [rdpSession, sshSession, sftpSession]);
 
+const credentialProfileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  username: z.string().min(1),
+  domain: z.string().optional(),
+  type: z.enum(['windows', 'linux', 'generic']),
+  tags: z.array(z.string()).optional(),
+  favorite: z.boolean(),
+  lastUsed: z.string().optional(),
+  secretRef: z.string().min(1)
+});
+
 export const vaultSchema = z.object({
   schemaVersion: z.string(),
   appSettings: z.object({
@@ -57,6 +73,7 @@ export const vaultSchema = z.object({
     recentSessionIds: z.array(z.string())
   }),
   sessions: z.array(sessionSchema),
+  credentials: z.array(credentialProfileSchema).default([]),
   encryptedSecrets: z.array(
     z.object({
       id: z.string(),

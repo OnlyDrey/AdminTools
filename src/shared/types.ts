@@ -1,4 +1,18 @@
 export type Protocol = 'rdp' | 'ssh' | 'sftp';
+export type SessionOsType = 'windows' | 'linux' | 'network' | 'hypervisor' | 'server' | 'unknown';
+export type CredentialType = 'windows' | 'linux' | 'generic';
+
+export interface CredentialProfile {
+  id: string;
+  name: string;
+  username: string;
+  domain?: string;
+  type: CredentialType;
+  tags?: string[];
+  favorite: boolean;
+  lastUsed?: string;
+  secretRef: string;
+}
 
 export interface SessionBase {
   id: string;
@@ -13,6 +27,10 @@ export interface SessionBase {
   favorite: boolean;
   colorLabel?: string;
   notes?: string;
+  osType?: SessionOsType;
+  iconMode?: 'auto' | 'custom';
+  customIcon?: string;
+  uploadedIconDataUrl?: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +84,7 @@ export interface VaultFile {
   schemaVersion: string;
   appSettings: AppSettings;
   sessions: Session[];
+  credentials: CredentialProfile[];
   encryptedSecrets: SecretEntry[];
   kdf: {
     salt: string;

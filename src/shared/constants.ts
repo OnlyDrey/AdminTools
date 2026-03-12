@@ -13,6 +13,7 @@ export const EMPTY_VAULT: VaultFile = {
   schemaVersion: SCHEMA_VERSION,
   appSettings: DEFAULT_SETTINGS,
   sessions: [],
+  credentials: [],
   encryptedSecrets: [],
   kdf: {
     salt: '',

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { Session, SessionImportExport, SftpEntry, VaultFile } from '../shared/types';
+import type { CredentialProfile, Session, SessionImportExport, SftpEntry, VaultFile } from '../shared/types';
 
 declare global {
   interface Window {
@@ -11,6 +11,11 @@ declare global {
       encryptSecret(id: string, secret: string, password: string): Promise<void>;
       exportSessions(path: string): Promise<void>;
       importSessions(path: string): Promise<SessionImportExport>;
+      listCredentials(): Promise<CredentialProfile[]>;
+      createCredential(payload: Omit<CredentialProfile, 'secretRef'>, password: string): Promise<CredentialProfile[]>;
+      updateCredential(payload: CredentialProfile, password?: string): Promise<CredentialProfile[]>;
+      deleteCredential(credentialId: string): Promise<CredentialProfile[]>;
+      resolveCredential(credentialId: string): Promise<{ id: string; username: string; password: string; domain?: string; type: string } | undefined>;
       launchRdp(session: Session): Promise<string>;
       detachSession(session: Session): Promise<boolean>;
       sshConnect(sessionId: string, payload: Record<string, unknown>): Promise<boolean>;
