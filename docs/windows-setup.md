@@ -1,6 +1,10 @@
 # Windows 11 setup and recovery guide
 
-This project is a Windows desktop app built with Electron + Vite + React.
+This document applies to the **legacy Electron track** in this repository.
+
+For the native C++ rewrite, use `admintools-native/docs/getting-started.md`.
+
+The legacy project is a Windows desktop app built with Electron + Vite + React.
 
 > Status note: the repository/toolchain is generally ready. If install fails with `RequestError: unable to get local issuer certificate`, the primary blocker is usually **environment TLS trust/proxy configuration** during Electron binary download.
 
