@@ -1,6 +1,54 @@
 export type Protocol = 'rdp' | 'ssh' | 'sftp';
 export type SessionOsType = 'windows' | 'linux' | 'network' | 'hypervisor' | 'server' | 'unknown';
 export type CredentialType = 'windows' | 'linux' | 'generic';
+export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'failed' | 'auth_failed' | 'timeout';
+
+export interface FolderNode {
+  id: string;
+  name: string;
+  parentId?: string;
+  order: number;
+  color?: string;
+  icon?: string;
+  description?: string;
+}
+
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  protocol: Protocol;
+  defaultPort: number;
+  defaultCredentialRef?: string;
+  displayMode?: 'fit' | 'actual' | 'stretch' | 'fullscreen';
+  osType?: SessionOsType;
+  tags?: string[];
+  folderId?: string;
+  iconMode?: 'auto' | 'custom';
+  color?: string;
+  notes?: string;
+  favorite: boolean;
+  order: number;
+}
+
+export interface ActivityEvent {
+  id: string;
+  timestamp: string;
+  eventType: 'session_connected' | 'session_disconnected' | 'reconnect_attempted' | 'authentication_failed' | 'file_uploaded' | 'file_downloaded' | 'session_created' | 'session_edited' | 'credential_created' | 'credential_updated' | 'credential_deleted' | 'quick_connect_used';
+  protocol?: Protocol;
+  targetHost?: string;
+  sessionName?: string;
+  status: 'ok' | 'warning' | 'error';
+  message: string;
+}
+
+export interface ConnectionDiagnostic {
+  host: string;
+  protocol: Protocol;
+  port: number;
+  timestamp: string;
+  category: 'auth' | 'network' | 'timeout' | 'remote_close' | 'unsupported' | 'unknown';
+  message: string;
+}
 
 export interface CredentialProfile {
   id: string;
@@ -23,6 +71,8 @@ export interface SessionBase {
   username: string;
   credentialRef?: string;
   folder?: string;
+  folderId?: string;
+  order?: number;
   tags: string[];
   favorite: boolean;
   colorLabel?: string;
@@ -71,6 +121,11 @@ export interface AppSettings {
   theme: 'dark' | 'system';
   quickConnectHistory: string[];
   recentSessionIds: string[];
+  expandedFolderIds: string[];
+  selectedFolderId?: string;
+  autoReconnect: boolean;
+  retryCount: number;
+  retryDelayMs: number;
 }
 
 export interface SecretEntry {
@@ -84,6 +139,9 @@ export interface VaultFile {
   schemaVersion: string;
   appSettings: AppSettings;
   sessions: Session[];
+  folders: FolderNode[];
+  templates: SessionTemplate[];
+  activityLog: ActivityEvent[];
   credentials: CredentialProfile[];
   encryptedSecrets: SecretEntry[];
   kdf: {

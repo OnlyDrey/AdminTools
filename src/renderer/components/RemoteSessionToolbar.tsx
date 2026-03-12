@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Session } from '../../shared/types';
+import type { ConnectionState, Session } from '../../shared/types';
 import { resolveCommandCapability } from '../remoteCommandRouter';
 import { getSessionMetaLabel, resolveSessionIcon } from '../sessionIcons';
-
-type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 
 export type RemoteCommand =
   | 'send-ctrl-alt-del'
@@ -29,7 +27,7 @@ export type RemoteCommand =
 
 interface RemoteSessionToolbarProps {
   session: Session;
-  status: ConnectionStatus;
+  status: ConnectionState;
   onCommand: (command: RemoteCommand) => void;
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CredentialProfile, Protocol, Session, SessionOsType } from '../../shared/types';
+import type { CredentialProfile, Protocol, Session, SessionOsType, SessionTemplate } from '../../shared/types';
 import { detectOsType, getSessionMetaLabel, resolveSessionIcon } from '../sessionIcons';
 
 interface SessionFormProps {
@@ -8,6 +8,7 @@ interface SessionFormProps {
   onCancel?: () => void;
   title?: string;
   credentials: CredentialProfile[];
+  templates: SessionTemplate[];
   onManageCredentials: () => void;
   onRememberCredential: (payload: { name: string; username: string; password: string; domain?: string; protocol: Protocol }) => Promise<string>;
 }
@@ -31,7 +32,7 @@ function sortCredentials(credentials: CredentialProfile[], protocol: Protocol, f
   });
 }
 
-export function SessionForm({ onSave, existing, onCancel, title, credentials, onManageCredentials, onRememberCredential }: SessionFormProps) {
+export function SessionForm({ onSave, existing, onCancel, title, credentials, templates, onManageCredentials, onRememberCredential }: SessionFormProps) {
   const [protocol, setProtocol] = useState<Protocol>(existing?.protocol ?? 'ssh');
   const [name, setName] = useState(existing?.name ?? '');
   const [host, setHost] = useState(existing?.host ?? '');
@@ -53,6 +54,7 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, on
   const [customIcon, setCustomIcon] = useState(existing?.customIcon ?? '');
   const [uploadedIconDataUrl, setUploadedIconDataUrl] = useState(existing?.uploadedIconDataUrl ?? '');
   const [warning, setWarning] = useState('');
+  const [templateId, setTemplateId] = useState('');
 
   useEffect(() => {
     if (!name.trim() && host.trim()) setName(host.trim());
@@ -74,6 +76,32 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, on
       setWarning('');
     }
   }, [credentialSelection, selectedCredential, protocol, oneTimeUsername]);
+
+
+  const applyTemplate = (selectedTemplateId: string) => {
+    setTemplateId(selectedTemplateId);
+    const template = templates.find((item) => item.id === selectedTemplateId);
+    if (!template) return;
+    setProtocol(template.protocol);
+    setPort(template.defaultPort);
+    setPortMode('custom');
+    if (template.defaultCredentialRef) {
+      setCredentialSelection(template.defaultCredentialRef);
+    }
+    if (template.osType) {
+      setOsMode('manual');
+      setManualOsType(template.osType);
+    }
+    if (template.tags?.length) {
+      setTags(template.tags.join(', '));
+    }
+    if (template.folderId) {
+      setFolder(template.folderId);
+    }
+    if (template.notes) {
+      setNotes(template.notes);
+    }
+  };
 
   const onProtocolChange = (next: Protocol) => {
     setProtocol(next);
@@ -151,6 +179,10 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, on
       </div>
 
       <div className="session-form-grid">
+        <select value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
+          <option value="">No template</option>
+          {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+        </select>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Session name" />
         <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host" />
         <select value={protocol} onChange={(e) => onProtocolChange(e.target.value as Protocol)}>
