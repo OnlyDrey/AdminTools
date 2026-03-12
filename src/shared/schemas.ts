@@ -9,10 +9,16 @@ const baseSession = z.object({
   username: z.string().min(1),
   credentialRef: z.string().optional(),
   folder: z.string().optional(),
+  folderId: z.string().optional(),
+  order: z.number().int().optional(),
   tags: z.array(z.string()),
   favorite: z.boolean(),
   colorLabel: z.string().optional(),
   notes: z.string().optional(),
+  osType: z.enum(['windows', 'linux', 'network', 'hypervisor', 'server', 'unknown']).optional(),
+  iconMode: z.enum(['auto', 'custom']).optional(),
+  customIcon: z.string().optional(),
+  uploadedIconDataUrl: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -49,14 +55,135 @@ const sftpSession = baseSession.extend({
 
 export const sessionSchema = z.discriminatedUnion('protocol', [rdpSession, sshSession, sftpSession]);
 
+const credentialProfileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  username: z.string().min(1),
+  domain: z.string().optional(),
+  type: z.enum(['windows', 'linux', 'generic']),
+  tags: z.array(z.string()).optional(),
+  favorite: z.boolean(),
+  lastUsed: z.string().optional(),
+  secretRef: z.string().min(1)
+});
+
+const folderSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  parentId: z.string().optional(),
+  order: z.number().int(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+  description: z.string().optional()
+});
+
+const templateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  protocol: z.enum(['rdp', 'ssh', 'sftp']),
+  defaultPort: z.number().int().positive(),
+  defaultCredentialRef: z.string().optional(),
+  displayMode: z.enum(['fit', 'actual', 'stretch', 'fullscreen']).optional(),
+  osType: z.enum(['windows', 'linux', 'network', 'hypervisor', 'server', 'unknown']).optional(),
+  tags: z.array(z.string()).optional(),
+  folderId: z.string().optional(),
+  iconMode: z.enum(['auto', 'custom']).optional(),
+  color: z.string().optional(),
+  notes: z.string().optional(),
+  favorite: z.boolean(),
+  order: z.number().int()
+});
+
+
+const smartViewSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  query: z.string().optional(),
+  protocol: z.enum(['rdp', 'ssh', 'sftp']).optional(),
+  folderId: z.string().optional(),
+  favoritesOnly: z.boolean().optional(),
+  recentOnly: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
+  connectionState: z.enum(['idle', 'connecting', 'connected', 'reconnecting', 'disconnected', 'failed', 'auth_failed', 'timeout']).optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+  pinned: z.boolean(),
+  order: z.number().int()
+});
+
+const activitySchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  eventType: z.enum(['session_connected', 'session_disconnected', 'reconnect_attempted', 'authentication_failed', 'file_uploaded', 'file_downloaded', 'session_created', 'session_edited', 'credential_created', 'credential_updated', 'credential_deleted', 'quick_connect_used']),
+  protocol: z.enum(['rdp', 'ssh', 'sftp']).optional(),
+  targetHost: z.string().optional(),
+  sessionName: z.string().optional(),
+  status: z.enum(['ok', 'warning', 'error']),
+  message: z.string()
+});
+
+
+const workspaceViewInstanceSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  createdAt: z.string()
+});
+
+const workspacePaneSchema = z.object({
+  id: z.string(),
+  tabIds: z.array(z.string()).default([]),
+  activeTabId: z.string().optional(),
+  size: z.number().positive().default(1)
+});
+
+const workspaceLayoutSchema = z.object({
+  split: z.enum(['none', 'vertical', 'horizontal']).default('none'),
+  panes: z.array(workspacePaneSchema).default([{ id: 'pane-main', tabIds: [], size: 1 }]),
+  focusedPaneId: z.string().optional()
+});
+
 export const vaultSchema = z.object({
   schemaVersion: z.string(),
   appSettings: z.object({
     theme: z.enum(['dark', 'system']),
     quickConnectHistory: z.array(z.string()),
-    recentSessionIds: z.array(z.string())
+    recentSessionIds: z.array(z.string()),
+    expandedFolderIds: z.array(z.string()).default([]),
+    selectedFolderId: z.string().optional(),
+    autoReconnect: z.boolean().default(false),
+    retryCount: z.number().int().default(2),
+    retryDelayMs: z.number().int().default(1000),
+    workspace: z.object({
+      reopenOnStartup: z.boolean().default(true),
+      reconnectOnStartup: z.boolean().default(false),
+      restoreActiveTab: z.boolean().default(true),
+      restoreSidebar: z.boolean().default(true),
+      openTabIds: z.array(z.string()).default([]),
+      activeTabId: z.string().optional(),
+      detachedSessionIds: z.array(z.string()).default([]),
+      selectedFolderId: z.string().optional(),
+      expandedFolderIds: z.array(z.string()).default([]),
+      searchQuery: z.string().optional(),
+      selectedViewId: z.string().optional(),
+      tabState: z.array(z.object({
+        sessionId: z.string(),
+        displayMode: z.enum(['fit', 'actual', 'stretch', 'fullscreen']).optional(),
+        toolbarVisible: z.boolean().optional(),
+        ssh: z.object({ fontSize: z.number().optional(), wrap: z.boolean().optional() }).optional(),
+        sftp: z.object({ localPath: z.string().optional(), remotePath: z.string().optional() }).optional()
+      })).default([]),
+      viewInstances: z.array(workspaceViewInstanceSchema).default([]),
+      layout: workspaceLayoutSchema.optional()
+    }).default({
+      reopenOnStartup: true, reconnectOnStartup: false, restoreActiveTab: true, restoreSidebar: true, openTabIds: [], detachedSessionIds: [], expandedFolderIds: [], tabState: [], viewInstances: [], layout: { split: 'none', panes: [{ id: 'pane-main', tabIds: [], size: 1 }], focusedPaneId: 'pane-main' }
+    })
   }),
   sessions: z.array(sessionSchema),
+  folders: z.array(folderSchema).default([]),
+  templates: z.array(templateSchema).default([]),
+  smartViews: z.array(smartViewSchema).default([]),
+  activityLog: z.array(activitySchema).default([]),
+  credentials: z.array(credentialProfileSchema).default([]),
   encryptedSecrets: z.array(
     z.object({
       id: z.string(),

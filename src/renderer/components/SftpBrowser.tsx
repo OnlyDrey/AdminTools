@@ -14,10 +14,12 @@ export function SftpBrowser({ session }: SftpBrowserProps) {
     if (session.protocol !== 'sftp') return;
     setStatus('Connecting...');
     try {
+      const resolved = session.credentialRef ? await window.api.resolveCredential(session.credentialRef) : undefined;
       await window.api.sftpConnect(session.id, {
         host: session.host,
         port: session.port,
-        username: session.username
+        username: resolved?.username ?? session.username,
+        password: resolved?.password
       });
       const list = await window.api.sftpList(session.id, path);
       setEntries(list);

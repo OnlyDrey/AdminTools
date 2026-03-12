@@ -1,0 +1,154 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { ConnectionState, Session } from '../../shared/types';
+import { resolveCommandCapability } from '../remoteCommandRouter';
+import { getSessionMetaLabel, resolveSessionIcon } from '../sessionIcons';
+
+export type RemoteCommand =
+  | 'send-ctrl-alt-del'
+  | 'send-ctrl-esc'
+  | 'send-win'
+  | 'send-alt-tab'
+  | 'open-task-manager'
+  | 'lock-workstation'
+  | 'reconnect'
+  | 'disconnect'
+  | 'fullscreen-toggle'
+  | 'fit-window'
+  | 'scale-100'
+  | 'send-clipboard'
+  | 'sync-clipboard'
+  | 'detach'
+  | 'copy'
+  | 'paste'
+  | 'clear'
+  | 'new-terminal-tab'
+  | 'toggle-wrap'
+  | 'download-transcript';
+
+interface RemoteSessionToolbarProps {
+  session: Session;
+  status: ConnectionState;
+  onCommand: (command: RemoteCommand) => void;
+}
+
+interface CommandDef {
+  id: RemoteCommand;
+  label: string;
+  icon: string;
+  shortcut?: string;
+}
+
+const baseQuickCommands: CommandDef[] = [
+  { id: 'send-ctrl-alt-del', label: 'Send Ctrl+Alt+Del', icon: '🧷', shortcut: 'Ctrl+Shift+End' },
+  { id: 'send-ctrl-esc', label: 'Send Ctrl+Esc', icon: '⎋' },
+  { id: 'send-win', label: 'Send Win key', icon: '⊞' },
+  { id: 'send-alt-tab', label: 'Send Alt+Tab', icon: '⇥' },
+  { id: 'open-task-manager', label: 'Open Task Manager', icon: '📋' },
+  { id: 'lock-workstation', label: 'Lock workstation', icon: '🔒' },
+  { id: 'send-clipboard', label: 'Send clipboard', icon: '📎' },
+  { id: 'sync-clipboard', label: 'Sync clipboard toggle', icon: '🔁' }
+];
+
+const sshQuickCommands: CommandDef[] = [
+  { id: 'copy', label: 'Copy', icon: '📄' },
+  { id: 'paste', label: 'Paste', icon: '📋' },
+  { id: 'clear', label: 'Clear terminal', icon: '🧹' },
+  { id: 'new-terminal-tab', label: 'New terminal tab', icon: '➕' },
+  { id: 'toggle-wrap', label: 'Toggle wrap', icon: '↩' },
+  { id: 'download-transcript', label: 'Download transcript', icon: '⬇' }
+];
+
+const viewCommands: CommandDef[] = [
+  { id: 'reconnect', label: 'Reconnect', icon: '🔄' },
+  { id: 'disconnect', label: 'Disconnect', icon: '⛔' },
+  { id: 'fullscreen-toggle', label: 'Fullscreen toggle', icon: '⛶' },
+  { id: 'fit-window', label: 'Fit to window', icon: '🪟' },
+  { id: 'scale-100', label: '100% scale', icon: '1:1' },
+  { id: 'detach', label: 'Detach session', icon: '↗' }
+];
+
+export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessionToolbarProps) {
+  const [hovering, setHovering] = useState(false);
+  const [lastInteraction, setLastInteraction] = useState(Date.now());
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 300);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const quickCommands = session.protocol === 'ssh' ? sshQuickCommands : baseQuickCommands;
+  const isVisible = useMemo(() => hovering || now - lastInteraction < 2500, [hovering, lastInteraction, now]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'End') {
+        event.preventDefault();
+        onCommand('send-ctrl-alt-del');
+        setLastInteraction(Date.now());
+      }
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        onCommand('fullscreen-toggle');
+        setLastInteraction(Date.now());
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCommand]);
+
+  return (
+    <div
+      className={`remote-toolbar-shell ${isVisible ? 'visible' : 'hidden'}`}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onMouseMove={() => setLastInteraction(Date.now())}
+    >
+      <div className="remote-toolbar left">
+        <span title={getSessionMetaLabel(session)}>{resolveSessionIcon(session).startsWith('data:') ? <img className="session-icon-img" src={resolveSessionIcon(session)} alt="session icon" /> : resolveSessionIcon(session)}</span>
+        <strong>{session.name}</strong>
+        <span className="muted">{session.protocol.toUpperCase()}</span>
+        <span className={`status-pill ${status}`}>{status}</span>
+        {session.protocol === 'rdp' && <span className="muted">External client mode</span>}
+      </div>
+
+      <div className="remote-toolbar center">
+        {quickCommands.map((command) => {
+          const capability = resolveCommandCapability(session, command.id);
+          return (
+            <button
+              key={command.id}
+              disabled={!capability.enabled}
+              title={`${command.label}${command.shortcut ? ` (${command.shortcut})` : ''}${capability.enabled ? '' : ` (${capability.reason})`}`}
+              onClick={() => {
+                onCommand(command.id);
+                setLastInteraction(Date.now());
+              }}
+            >
+              {command.icon}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="remote-toolbar right">
+        {viewCommands.map((command) => {
+          const capability = resolveCommandCapability(session, command.id);
+          return (
+            <button
+              key={command.id}
+              disabled={!capability.enabled}
+              title={`${command.label}${capability.enabled ? '' : ` (${capability.reason})`}`}
+              onClick={() => {
+                onCommand(command.id);
+                setLastInteraction(Date.now());
+              }}
+            >
+              {command.icon}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
