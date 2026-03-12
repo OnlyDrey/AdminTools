@@ -16,6 +16,9 @@ export function resolveCommandCapability(session: Session, command: RemoteComman
     'open-task-manager'
   ];
 
+
+  const embeddedOnly: RemoteCommand[] = ['fullscreen-toggle', 'fit-window', 'scale-100'];
+
   if ((session.protocol === 'ssh' || session.protocol === 'sftp') && windowsOnly.includes(command)) {
     return { enabled: false, reason: 'Windows desktop command is unavailable for this protocol.' };
   }
@@ -25,7 +28,11 @@ export function resolveCommandCapability(session: Session, command: RemoteComman
   }
 
   if (session.protocol === 'rdp' && windowsOnly.includes(command)) {
-    return { enabled: false, reason: 'System RDP client mode cannot inject this key yet. Embedded RDP hook prepared.' };
+    return { enabled: false, reason: 'System RDP client mode cannot inject this key yet. Embedded mode is planned.' };
+  }
+
+  if (session.protocol === 'rdp' && embeddedOnly.includes(command)) {
+    return { enabled: false, reason: 'This control requires embedded RDP rendering.' };
   }
 
   return { enabled: true };

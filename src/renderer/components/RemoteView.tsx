@@ -57,6 +57,7 @@ export function RemoteView({ session, children }: RemoteViewProps) {
   }, [engine]);
 
   const viewClass = displayMode === 'stretch' ? 'remote-surface stretch' : displayMode === 'actual' ? 'remote-surface actual' : 'remote-surface fit';
+  const externalClientMode = session.protocol === 'rdp' && !engine.supportsEmbeddedSurface;
 
   return (
     <div className="remote-view">
@@ -66,9 +67,11 @@ export function RemoteView({ session, children }: RemoteViewProps) {
           <option value="fit">Fit to window</option>
           <option value="actual">100%</option>
           <option value="stretch">Stretch</option>
-          <option value="fullscreen">Fullscreen</option>
+          {!externalClientMode && <option value="fullscreen">Fullscreen</option>}
         </select>
       </div>
+
+      {externalClientMode && <p className="muted">External client mode: rendering surface is not embedded yet.</p>}
 
       {showReconnectAtSize && (
         <div className="remote-resize-warning row between">
@@ -80,7 +83,7 @@ export function RemoteView({ session, children }: RemoteViewProps) {
       )}
 
       <div ref={hostRef} className={viewClass}>
-        {displayMode === 'fullscreen' ? (
+        {displayMode === 'fullscreen' && !externalClientMode ? (
           <button className="fullscreen-btn" onClick={() => hostRef.current?.requestFullscreen().catch(() => undefined)}>Enter fullscreen</button>
         ) : null}
         {children}

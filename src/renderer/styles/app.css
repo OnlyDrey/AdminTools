@@ -178,3 +178,14 @@ button { cursor: pointer; }
 .session-chip.ok { color: #86efac; }
 .session-chip.warning { color: #fcd34d; }
 .bell-flash { outline: 1px solid #93c5fd; box-shadow: 0 0 0 2px rgba(147,197,253,.3); }
+
+
+.primary { background: #2563eb; border-color: #1d4ed8; color: white; }
+.detached-app .layout { grid-template-columns: 1fr; }
+.detached-topbar { grid-template-columns: 1fr auto auto; }
+.rdp-panel { display: grid; gap: 12px; }
+.rdp-panel-header { display: flex; justify-content: space-between; align-items: center; }
+.rdp-panel-actions { flex-wrap: wrap; }
+.rdp-panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card-like { background: var(--surface-2); border: 1px solid #1f2937; border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+@media (max-width: 900px) { .rdp-panel-grid { grid-template-columns: 1fr; } }

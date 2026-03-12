@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CredentialProfile, Session, VaultFile } from '../shared/types.js';
-import { launchRdp } from './protocolLauncher.js';
 import {
   closeSftp,
   connectSftp,
@@ -32,6 +31,7 @@ import {
   saveVault
 } from './vaultService.js';
 import { deleteCredentialSecret, getCredentialSecret, setCredentialSecret } from './credentialSecureStore.js';
+import { launchRdpSession } from './rdpLaunchService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -219,10 +219,11 @@ ipcMain.handle('credentials:resolve', async (_event, credentialId: string) => {
 });
 
 ipcMain.handle('rdp:launch', async (_event, session: Session) => {
+  if (!inMemoryVault) throw new Error('Vault not loaded');
   if (session.protocol !== 'rdp') {
     throw new Error('Not an RDP session');
   }
-  return launchRdp(session);
+  return launchRdpSession(session, inMemoryVault.credentials ?? [], (secretRef) => getCredentialSecret(secretRef));
 });
 
 ipcMain.handle('window:detach', (_event, session: Session) => {

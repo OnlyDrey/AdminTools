@@ -11,6 +11,7 @@ interface SessionFormProps {
   templates: SessionTemplate[];
   onManageCredentials: () => void;
   onRememberCredential: (payload: { name: string; username: string; password: string; domain?: string; protocol: Protocol }) => Promise<string>;
+  onSaveAndConnect?: (session: Session) => Promise<void>;
 }
 
 const defaultPortByProtocol: Record<Protocol, number> = { rdp: 3389, ssh: 22, sftp: 22 };
@@ -32,7 +33,7 @@ function sortCredentials(credentials: CredentialProfile[], protocol: Protocol, f
   });
 }
 
-export function SessionForm({ onSave, existing, onCancel, title, credentials, templates, onManageCredentials, onRememberCredential }: SessionFormProps) {
+export function SessionForm({ onSave, existing, onCancel, title, credentials, templates, onManageCredentials, onRememberCredential, onSaveAndConnect }: SessionFormProps) {
   const [protocol, setProtocol] = useState<Protocol>(existing?.protocol ?? 'ssh');
   const [name, setName] = useState(existing?.name ?? '');
   const [host, setHost] = useState(existing?.host ?? '');
@@ -142,7 +143,7 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, te
     [existing, folder, host, name, notes, oneTimeUsername, port, protocol, selectedCredential, tags, effectiveOs, iconMode, customIcon, uploadedIconDataUrl]
   );
 
-  const submit = async () => {
+  const persist = async (connectAfterSave = false) => {
     if (!base.name || !base.host || !base.username || warning) return;
     let credentialRef = base.credentialRef;
     let username = base.username;
@@ -159,14 +160,20 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, te
     }
 
     if (protocol === 'rdp') {
-      await onSave({ ...base, username, credentialRef, protocol, domain: domain.trim() || undefined, resolutionMode, fullscreen: false, adminMode: false, clipboard: true, driveRedirection: false, sound: 'local' });
+      const session = { ...base, username, credentialRef, protocol, domain: domain.trim() || undefined, resolutionMode, fullscreen: false, adminMode: false, clipboard: true, driveRedirection: false, sound: 'local' } as Session;
+      if (connectAfterSave && onSaveAndConnect) return onSaveAndConnect(session);
+      await onSave(session);
       return;
     }
     if (protocol === 'ssh') {
-      await onSave({ ...base, username, credentialRef, protocol, terminalProfile: 'default' });
+      const session = { ...base, username, credentialRef, protocol, terminalProfile: 'default' } as Session;
+      if (connectAfterSave && onSaveAndConnect) return onSaveAndConnect(session);
+      await onSave(session);
       return;
     }
-    await onSave({ ...base, username, credentialRef, protocol, showHiddenFiles: false, remotePath: '/' });
+    const session = { ...base, username, credentialRef, protocol, showHiddenFiles: false, remotePath: '/' } as Session;
+    if (connectAfterSave && onSaveAndConnect) return onSaveAndConnect(session);
+    await onSave(session);
   };
 
   const previewIcon = resolveSessionIcon(base as Session);
@@ -262,7 +269,11 @@ export function SessionForm({ onSave, existing, onCancel, title, credentials, te
         </div>
       )}
 
-      <div className="row end"><button onClick={submit}>Save session</button></div>
+      <div className="row end">
+        {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+        <button type="button" onClick={() => persist(false)}>Save</button>
+        <button type="button" className="primary" onClick={() => persist(true)}>Save & Connect</button>
+      </div>
     </div>
   );
 }

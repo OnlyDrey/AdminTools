@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ConnectionDiagnostic, ConnectionState, CredentialProfile, FolderNode, Session, SessionTemplate, SmartView } from '../shared/types';
+import type { ConnectionDiagnostic, ConnectionState, CredentialProfile, FolderNode, RdpLaunchResult, RdpSession, Session, SessionTemplate, SmartView } from '../shared/types';
 import { ActivityLogPanel } from './components/ActivityLogPanel';
 import { CredentialManager } from './components/CredentialManager';
 import { RemoteSessionToolbar, type RemoteCommand } from './components/RemoteSessionToolbar';
 import { RemoteView } from './components/RemoteView';
+import { RdpSessionPanel } from './components/RdpSessionPanel';
 import { SessionForm } from './components/SessionForm';
 import { SessionTreeSidebar } from './components/SessionTreeSidebar';
 import { SftpExplorerView } from './components/SftpExplorerView';
@@ -46,7 +47,13 @@ export function App() {
   const [sessionStatus, setSessionStatus] = useState<Record<string, ConnectionState>>({});
   const [sessionMessages, setSessionMessages] = useState<Record<string, string>>({});
   const [diagnostics, setDiagnostics] = useState<Record<string, ConnectionDiagnostic | undefined>>({});
+  const [rdpLaunchInfo, setRdpLaunchInfo] = useState<Record<string, RdpLaunchResult | undefined>>({});
   const didRestoreRef = useRef(false);
+  const detachedSessionId = useMemo(() => {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash.startsWith('/detached/')) return undefined;
+    return hash.split('/')[2];
+  }, []);
 
   const sessions = vault?.sessions ?? [];
   const folders = vault?.folders ?? [];
@@ -133,12 +140,25 @@ export function App() {
     });
   };
 
+
+  const launchRdpFromTab = async (session: RdpSession) => {
+    await setState(session, 'connecting', 'Launching external RDP client…');
+    const result = await window.api.launchRdp(session);
+    setRdpLaunchInfo((current) => ({ ...current, [session.id]: result }));
+    if (result.status === 'failed') {
+      await setState(session, 'failed', result.message, 'network');
+      return;
+    }
+    await setState(session, 'connected', result.warning ?? result.message);
+  };
+
   const handleToolbarCommand = async (session: Session, command: RemoteCommand) => {
     await routeRemoteCommand(session, command, {
       reconnect: async () => {
         await setState(session, 'reconnecting', 'Reconnect attempted');
         if (session.protocol === 'rdp') {
-          await window.api.launchRdp(session).catch(async () => setState(session, 'failed', 'RDP client launch failed', 'network'));
+          await launchRdpFromTab(session);
+          return;
         }
         window.setTimeout(() => {
           setState(session, 'connected', 'Connected');
@@ -149,7 +169,8 @@ export function App() {
       },
       detach: async () => {
         await window.api.detachSession(session);
-        setToast(session.id, 'Detached to new window');
+        setActiveTabIds((current) => current.filter((id) => id !== session.id));
+        setToast(session.id, 'Detached to session window');
       },
       feedback: (message) => setToast(session.id, message)
     });
@@ -244,6 +265,49 @@ export function App() {
     updateWorkspace({ searchQuery: search }).catch(() => undefined);
   }, [search, updateWorkspace, workspace]);
 
+
+
+  const renderSessionSurface = (session: Session) => (
+    <section key={session.id} className="card remote-session-card">
+      <RemoteSessionToolbar session={session} status={sessionStatus[session.id] ?? 'idle'} onCommand={(command) => handleToolbarCommand(session, command)} />
+      {sessionMessages[session.id] && <p className="muted remote-toast">{sessionMessages[session.id]}</p>}
+      {diagnostics[session.id] && <p className="muted">{diagnostics[session.id]?.category}: {diagnostics[session.id]?.message}</p>}
+      <RemoteView session={session}>
+        {session.protocol === 'ssh' && <SshTerminalView session={session} />}
+        {session.protocol === 'sftp' && <SftpExplorerView session={session} />}
+        {session.protocol === 'rdp' && (
+          <RdpSessionPanel
+            session={session}
+            status={sessionStatus[session.id] ?? 'idle'}
+            launchInfo={rdpLaunchInfo[session.id]}
+            onReconnect={() => handleToolbarCommand(session, 'reconnect').catch(() => undefined)}
+            onDisconnect={() => handleToolbarCommand(session, 'disconnect').catch(() => undefined)}
+            onDetach={() => handleToolbarCommand(session, 'detach').catch(() => undefined)}
+            onSetDisplayMode={(mode) => upsertSession({ ...session, resolutionMode: mode }).catch(() => undefined)}
+            onCopyHost={() => navigator.clipboard.writeText(`${session.host}:${session.port}`).catch(() => undefined)}
+            onCopyUsername={() => navigator.clipboard.writeText(session.username).catch(() => undefined)}
+          />
+        )}
+      </RemoteView>
+    </section>
+  );
+
+  if (detachedSessionId) {
+    const detachedSession = sessions.find((s) => s.id === detachedSessionId);
+    if (!detachedSession) {
+      return <div className="app dark"><main className="main"><section className="card"><h3>Detached session not found</h3></section></main></div>;
+    }
+    return (
+      <div className="app dark detached-app">
+        <header className="topbar detached-topbar">
+          <strong>{detachedSession.name}</strong>
+          <span className="muted">{detachedSession.protocol.toUpperCase()} • {sessionStatus[detachedSession.id] ?? 'idle'}</span>
+          <button onClick={() => window.api.reattachSession(detachedSession.id)}>Reattach to main window</button>
+        </header>
+        <main className="main">{renderSessionSurface(detachedSession)}</main>
+      </div>
+    );
+  }
 
   const moveSessionToFolder = async (sessionId: string, folderId?: string) => {
     if (!vault) return;
@@ -415,8 +479,8 @@ export function App() {
                         <button onClick={() => { setEditing(session); setShowForm(true); }}>Edit</button>
                         <button onClick={() => duplicateSession(session)}>Duplicate</button>
                         <button onClick={() => moveSessionToFolder(session.id, undefined)}>Move to root</button>
-                        {session.protocol === 'rdp' && <button onClick={() => window.api.launchRdp(session)}>Launch RDP</button>}
-                        <button onClick={() => window.api.detachSession(session)}>Detach</button>
+                        {session.protocol === 'rdp' && <button onClick={() => openTab(session)}>Open RDP tab</button>}
+                        <button onClick={() => handleToolbarCommand(session, 'detach')}>Detach</button>
                         <button onClick={() => deleteSession(session.id)}>Delete</button>
                       </div>
                     </details>
@@ -427,18 +491,7 @@ export function App() {
             </div>
           </section>
 
-          {activeTabs.map((session) => (
-            <section key={session.id} className="card remote-session-card">
-              <RemoteSessionToolbar session={session} status={sessionStatus[session.id] ?? 'idle'} onCommand={(command) => handleToolbarCommand(session, command)} />
-              {sessionMessages[session.id] && <p className="muted remote-toast">{sessionMessages[session.id]}</p>}
-              {diagnostics[session.id] && <p className="muted">{diagnostics[session.id]?.category}: {diagnostics[session.id]?.message}</p>}
-              <RemoteView session={session}>
-                {session.protocol === 'ssh' && <SshTerminalView session={session} />}
-                {session.protocol === 'sftp' && <SftpExplorerView session={session} />}
-                {session.protocol === 'rdp' && <div><p>RDP sessions launch in system client in MVP.</p><button onClick={() => window.api.launchRdp(session)}>Reconnect with system RDP client</button></div>}
-              </RemoteView>
-            </section>
-          ))}
+          {activeTabs.map((session) => renderSessionSurface(session))}
         </main>
       </div>
 
@@ -468,6 +521,13 @@ export function App() {
                 const next = await window.api.createCredential({ id, name: payload.name, username: payload.username, domain: payload.domain, type, tags: [payload.protocol], favorite: false, lastUsed: undefined }, payload.password);
                 setCredentials(next);
                 return id;
+              }}
+              onSaveAndConnect={async (session) => {
+                const next = editing ? session : { ...session, folderId: selectedFolderId };
+                await upsertSession(next);
+                await openTab(next);
+                setShowForm(false);
+                setEditing(undefined);
               }}
               onCancel={() => { setShowForm(false); setEditing(undefined); }}
             />

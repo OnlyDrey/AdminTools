@@ -198,6 +198,18 @@ export interface SessionImportExport {
   sessions: Session[];
 }
 
+
+export interface RdpLaunchResult {
+  status: 'launching' | 'launched' | 'failed';
+  mode: 'external-client';
+  launchMethod: 'mstsc-rdp-file' | 'unsupported-platform';
+  credentialStatus: 'used-saved' | 'used-session-username' | 'missing' | 'unsupported';
+  message: string;
+  stagedCredentialTarget?: string;
+  launchedAt: string;
+  warning?: string;
+}
+
 export interface SftpEntry {
   name: string;
   type: string;

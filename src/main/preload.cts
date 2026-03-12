@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CredentialProfile, Session, SessionImportExport, SftpEntry, VaultFile } from '../shared/types.js';
+import type { CredentialProfile, Session, RdpLaunchResult, SessionImportExport, SftpEntry, VaultFile } from '../shared/types.js';
 
 contextBridge.exposeInMainWorld('api', {
   loadVault: (masterPassword: string) => ipcRenderer.invoke('vault:load', masterPassword) as Promise<VaultFile>,
@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   updateCredential: (payload: CredentialProfile, password?: string) => ipcRenderer.invoke('credentials:update', payload, password) as Promise<CredentialProfile[]>,
   deleteCredential: (credentialId: string) => ipcRenderer.invoke('credentials:delete', credentialId) as Promise<CredentialProfile[]>,
   resolveCredential: (credentialId: string) => ipcRenderer.invoke('credentials:resolve', credentialId) as Promise<{ id: string; username: string; password: string; domain?: string; type: string } | undefined>,
-  launchRdp: (session: Session) => ipcRenderer.invoke('rdp:launch', session),
+  launchRdp: (session: Session) => ipcRenderer.invoke('rdp:launch', session) as Promise<RdpLaunchResult>,
   detachSession: (session: Session) => ipcRenderer.invoke('window:detach', session),
   reattachSession: (sessionId: string) => ipcRenderer.invoke('window:reattach', sessionId) as Promise<boolean>,
   listDetachedSessions: () => ipcRenderer.invoke('window:list-detached') as Promise<string[]>,

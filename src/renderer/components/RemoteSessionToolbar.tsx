@@ -109,6 +109,7 @@ export function RemoteSessionToolbar({ session, status, onCommand }: RemoteSessi
         <strong>{session.name}</strong>
         <span className="muted">{session.protocol.toUpperCase()}</span>
         <span className={`status-pill ${status}`}>{status}</span>
+        {session.protocol === 'rdp' && <span className="muted">External client mode</span>}
       </div>
 
       <div className="remote-toolbar center">
